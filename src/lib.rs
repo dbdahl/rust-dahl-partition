@@ -1,10 +1,12 @@
+#![allow(dead_code)]
+
+pub mod summary;
+
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
 use std::hash::Hash;
-
-// ## Partition
 
 /// A partition of `n_items` is a set of subsets such that the subsets are mutually exclusive,
 /// nonempty, and exhaustive.  This data structure enforces mutually exclusivity and provides
@@ -127,10 +129,16 @@ impl Partition {
         self.subsets.len()
     }
 
+    /// A vector of length `n_items` whose elements are subset labels.  Panics if any items are
+    /// not allocated.
+    pub fn labels(&self) -> Vec<usize> {
+        self.labels.iter().map(|x| x.unwrap()).collect()
+    }
+
     /// A reference to a vector of length `n_items` whose elements are `None` for items that are
-    /// not allocated and, for items that are allocated, `Some(subset_index)` where `subset_index`
+    /// not allocated (i.e., missing) and, for items that are allocated, `Some(subset_index)` where `subset_index`
     /// is the index of the subset to which the item is allocated.
-    pub fn labels(&self) -> &Vec<Option<usize>> {
+    pub fn labels_with_missing(&self) -> &Vec<Option<usize>> {
         &self.labels
     }
 
@@ -503,9 +511,9 @@ mod partition_tests {
         assert_eq!(p0.to_string(), "0 1 2 2 2 3 0");
         let p1 = Partition::from("ABCAADAABD".as_bytes());
         assert_eq!(p1.to_string(), "0 1 2 0 0 3 0 0 1 3");
-        let p2 = Partition::from(p1.labels());
+        let p2 = Partition::from(p1.labels_with_missing());
         assert_eq!(p1.to_string(), p2.to_string());
-        let p3 = Partition::from(p0.labels());
+        let p3 = Partition::from(p0.labels_with_missing());
         assert_eq!(p0.to_string(), p3.to_string());
     }
 
