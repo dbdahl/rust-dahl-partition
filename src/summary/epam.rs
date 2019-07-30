@@ -1,4 +1,4 @@
-use super::*;
+use super::super::*;
 use std::os::raw::c_double;
 use std::os::raw::c_int;
 use std::slice;
@@ -44,8 +44,8 @@ mod summary_tests {
 
 #[no_mangle]
 pub unsafe extern "C" fn expected_pairwise_allocation_matrix_fromC(
-    n_samples: i32,
-    n_items: i32,
+    n_samples: c_int,
+    n_items: c_int,
     partitions_ptr: *const c_int,
     counts_ptr: *mut c_double,
 ) -> () {
