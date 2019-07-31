@@ -26,7 +26,7 @@ pub fn expected_pairwise_allocation_matrix(partitions: &Vec<Partition>) -> Vec<f
 }
 
 #[cfg(test)]
-mod summary_tests {
+mod tests {
     use super::*;
 
     #[test]
@@ -43,7 +43,7 @@ mod summary_tests {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn expected_pairwise_allocation_matrix_fromC(
+pub unsafe extern "C" fn DahlPartition_Summary_expected_pairwise_allocation_matrix(
     n_samples: c_int,
     n_items: c_int,
     partitions_ptr: *const c_int,

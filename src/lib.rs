@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+pub mod distribution;
 pub mod summary;
 
 use std::cmp::Ordering;
@@ -448,11 +449,11 @@ impl PartialEq for Partition {
 }
 
 #[cfg(test)]
-mod partition_tests {
+mod tests_partition {
     use super::*;
 
     #[test]
-    fn complete() {
+    fn test_complete() {
         let mut p = Partition::new(6);
         p.add(2);
         for i in &[3, 4, 5] {
@@ -488,7 +489,7 @@ mod partition_tests {
     }
 
     #[test]
-    fn canonicalize() {
+    fn test_canonicalize() {
         let mut p = Partition::new(6);
         p.add(0)
             .add_with_index(1, 0)
@@ -506,7 +507,7 @@ mod partition_tests {
     }
 
     #[test]
-    fn from() {
+    fn test_from() {
         let p0 = Partition::from(&[45, 34, 23, 23, 23, 24, 45]);
         assert_eq!(p0.to_string(), "0 1 2 2 2 3 0");
         let p1 = Partition::from("ABCAADAABD".as_bytes());
@@ -518,7 +519,7 @@ mod partition_tests {
     }
 
     #[test]
-    fn equality() {
+    fn test_equality() {
         let p0 = Partition::from("ABCAADAABD".as_bytes());
         let p1 = Partition::from("ABCAADAABD".as_bytes());
         let p2 = Partition::from("ABCRRRRRRD".as_bytes());
@@ -671,11 +672,11 @@ impl PartialEq for Subset {
 }
 
 #[cfg(test)]
-mod subset_tests {
+mod tests_subset {
     use super::*;
 
     #[test]
-    fn add() {
+    fn test_add() {
         let mut s = Subset::new();
         assert_eq!(s.add(0), true);
         assert_eq!(s.add(1), true);
@@ -687,7 +688,7 @@ mod subset_tests {
     }
 
     #[test]
-    fn merge() {
+    fn test_merge() {
         let mut s1 = Subset::from([2, 1, 6, 2].iter());
         let mut s2 = Subset::from([0, 2, 1].iter());
         s1.merge(&mut s2);
@@ -698,7 +699,7 @@ mod subset_tests {
     }
 
     #[test]
-    fn remove() {
+    fn test_remove() {
         let mut s = Subset::from([2, 1, 6, 2].iter());
         assert_eq!(s.remove(0), false);
         assert_eq!(s.remove(2), true);
@@ -706,7 +707,7 @@ mod subset_tests {
     }
 
     #[test]
-    fn equality() {
+    fn test_equality() {
         let s1 = Subset::from([2, 1, 6, 2].iter());
         let s2 = Subset::from([6, 1, 2].iter());
         assert_eq!(s1, s2);
