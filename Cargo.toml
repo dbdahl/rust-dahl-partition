@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["David B. Dahl <dahl@stat.byu.edu>"]
 edition = "2018"
 description = "An efficient representation of a set partition."
+homepage = "https://dahl.byu.edu"
 license = "MIT OR Apache-2.0"
 
 [build-dependencies]
