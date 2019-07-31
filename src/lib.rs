@@ -716,8 +716,6 @@ mod tests_subset {
     }
 }
 
-extern crate libc;
-
 use std::convert::TryFrom;
 use std::os::raw::{c_double, c_int};
 use std::slice;
