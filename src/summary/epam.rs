@@ -1,7 +1,4 @@
-use super::super::*;
-use std::os::raw::c_double;
-use std::os::raw::c_int;
-use std::slice;
+use crate::*;
 
 pub fn expected_pairwise_allocation_matrix(partitions: &Vec<Partition>) -> Vec<f64> {
     let n_samples = partitions.len();
@@ -42,21 +39,7 @@ mod tests {
 
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn DahlPartition_Summary_expected_pairwise_allocation_matrix(
-    n_samples: c_int,
-    n_items: c_int,
-    partitions_ptr: *const c_int,
-    counts_ptr: *mut c_double,
-) -> () {
-    let ns = n_samples as usize;
-    let ni = n_items as usize;
-    let partitions: &[c_int] = slice::from_raw_parts(partitions_ptr, ns * ni);
-    let counts: &mut [c_double] = slice::from_raw_parts_mut(counts_ptr, ni * ni);
-    expected_pairwise_allocation_matrix_engine(ns, ni, partitions, counts);
-}
-
-fn expected_pairwise_allocation_matrix_engine<A>(
+pub fn expected_pairwise_allocation_matrix_engine<A>(
     n_samples: usize,
     n_items: usize,
     partitions: &[A],

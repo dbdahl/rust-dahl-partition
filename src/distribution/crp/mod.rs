@@ -2,9 +2,6 @@ extern crate rand;
 
 use crate::Partition;
 use rand::distributions::{Distribution, WeightedIndex};
-use std::convert::TryFrom;
-use std::os::raw::{c_double, c_int};
-use std::slice;
 
 pub fn sample(n_items: usize, mass: f64) -> Partition {
     assert!(mass > 0.0, "Mass must be greater than 0.0.");
@@ -55,23 +52,4 @@ mod tests {
         }));
     }
 
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn DahlPartition_Distribution_Crp_sample(
-    n_samples: c_int,
-    n_items: c_int,
-    mass: c_double,
-    ptr: *mut c_int,
-) -> () {
-    let ns = n_samples as usize;
-    let ni = n_items as usize;
-    let array: &mut [c_int] = slice::from_raw_parts_mut(ptr, ns * ni);
-    for i in 0..ns {
-        let p = sample(ni, mass);
-        let labels = p.labels_with_missing();
-        for j in 0..ni {
-            array[ns * j + i] = c_int::try_from(labels[j].unwrap()).unwrap();
-        }
-    }
 }
