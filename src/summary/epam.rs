@@ -79,7 +79,7 @@ use std::os::raw::{c_double, c_int};
 use std::slice;
 
 #[no_mangle]
-pub unsafe extern "C" fn epam(
+pub unsafe extern "C" fn dahl_partition__summary__epam__expected_pairwise_allocation_matrix(
     n_samples: c_int,
     n_items: c_int,
     partitions_ptr: *const c_int,

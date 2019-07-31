@@ -59,7 +59,7 @@ use std::os::raw::{c_double, c_int};
 use std::slice;
 
 #[no_mangle]
-pub unsafe extern "C" fn crp_sample(
+pub unsafe extern "C" fn dahl_partition__distribution__crp__sample(
     n_samples: c_int,
     n_items: c_int,
     mass: c_double,
