@@ -74,3 +74,20 @@ where
         }
     }
 }
+
+use std::os::raw::{c_double, c_int};
+use std::slice;
+
+#[no_mangle]
+pub unsafe extern "C" fn epam(
+    n_samples: c_int,
+    n_items: c_int,
+    partitions_ptr: *const c_int,
+    counts_ptr: *mut c_double,
+) -> () {
+    let ns = n_samples as usize;
+    let ni = n_items as usize;
+    let partitions: &[c_int] = slice::from_raw_parts(partitions_ptr, ns * ni);
+    let counts: &mut [c_double] = slice::from_raw_parts_mut(counts_ptr, ni * ni);
+    expected_pairwise_allocation_matrix_engine(ns, ni, partitions, counts);
+}
