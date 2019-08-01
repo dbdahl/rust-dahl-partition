@@ -33,7 +33,7 @@ pub fn sample(n_items: usize, mass: f64) -> Partition {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::summary::epam;
+    use crate::summary::psm;
 
     #[test]
     fn test_sample() {
@@ -44,7 +44,7 @@ mod tests {
         for _ in 0..n_samples {
             samples.push(sample(n_items, mass));
         }
-        let epam = epam(&samples, true);
+        let epam = psm(&samples, true);
         let truth = 1.0 / (1.0 + mass);
         let margin_of_error = 3.58 * (truth * (1.0 - truth) / n_samples as f64).sqrt();
         assert!(epam.iter().all(|prob| {

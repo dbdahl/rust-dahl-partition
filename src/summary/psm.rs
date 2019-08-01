@@ -4,7 +4,7 @@ use crate::*;
 use std::os::raw::{c_double, c_int};
 use std::slice;
 
-pub fn epam(partitions: &Vec<Partition>, parallel: bool) -> Vec<f64> {
+pub fn psm(partitions: &Vec<Partition>, parallel: bool) -> Vec<f64> {
     let n_samples = partitions.len();
     assert!(
         n_samples > 0,
@@ -31,14 +31,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_epam() {
+    fn test_psm() {
         let mut partitions = Vec::new();
         partitions.push(Partition::from("AABB".as_bytes()));
         partitions.push(Partition::from("AAAB".as_bytes()));
         partitions.push(Partition::from("ABBB".as_bytes()));
         partitions.push(Partition::from("AAAB".as_bytes()));
-        let epam = epam(&partitions, true);
-        assert_eq!(format!("{:?}", epam), "[1.0, 0.75, 0.5, 0.0, 0.75, 1.0, 0.75, 0.25, 0.5, 0.75, 1.0, 0.5, 0.0, 0.25, 0.5, 1.0]");
+        let psm = psm(&partitions, true);
+        assert_eq!(format!("{:?}", psm), "[1.0, 0.75, 0.5, 0.0, 0.75, 1.0, 0.75, 0.25, 0.5, 0.75, 1.0, 0.5, 0.0, 0.25, 0.5, 1.0]");
     }
 
 }
@@ -124,7 +124,7 @@ where
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_partition__summary__epam(
+pub unsafe extern "C" fn dahl_partition__summary__psm(
     n_samples: c_int,
     n_items: c_int,
     parallel: c_int,
