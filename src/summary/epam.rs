@@ -4,10 +4,7 @@ use crate::*;
 use std::os::raw::{c_double, c_int};
 use std::slice;
 
-pub fn expected_pairwise_allocation_matrix(
-    partitions: &Vec<Partition>,
-    parallel: bool,
-) -> Vec<f64> {
+pub fn epam(partitions: &Vec<Partition>, parallel: bool) -> Vec<f64> {
     let n_samples = partitions.len();
     assert!(
         n_samples > 0,
@@ -25,13 +22,7 @@ pub fn expected_pairwise_allocation_matrix(
         }
     }
     let mut counts = vec![0.0; n_items * n_items];
-    expected_pairwise_allocation_matrix_engine(
-        n_samples,
-        n_items,
-        parallel,
-        &labels[..],
-        &mut counts[..],
-    );
+    engine(n_samples, n_items, parallel, &labels[..], &mut counts[..]);
     counts
 }
 
@@ -40,19 +31,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_expected_pairwise_allocation_matrix() {
+    fn test_epam() {
         let mut partitions = Vec::new();
         partitions.push(Partition::from("AABB".as_bytes()));
         partitions.push(Partition::from("AAAB".as_bytes()));
         partitions.push(Partition::from("ABBB".as_bytes()));
         partitions.push(Partition::from("AAAB".as_bytes()));
-        let epam = expected_pairwise_allocation_matrix(&partitions, true);
+        let epam = epam(&partitions, true);
         assert_eq!(format!("{:?}", epam), "[1.0, 0.75, 0.5, 0.0, 0.75, 1.0, 0.75, 0.25, 0.5, 0.75, 1.0, 0.5, 0.0, 0.25, 0.5, 1.0]");
     }
 
 }
 
-pub fn expected_pairwise_allocation_matrix_engine<A>(
+fn engine<A>(
     n_samples: usize,
     n_items: usize,
     parallel: bool,
@@ -63,7 +54,7 @@ where
     A: PartialEq + Sync + Send,
 {
     if !parallel {
-        expected_pairwise_allocation_matrix_engine2(n_samples, n_items, None, partitions, counts);
+        engine2(n_samples, n_items, None, partitions, counts);
     } else {
         let n_cores = num_cpus::get();
         let n_pairs = n_items * (n_items - 1) / 2;
@@ -88,13 +79,7 @@ where
                 let lower = plan[i];
                 let upper = plan[i + 1];
                 s.spawn(move |_| {
-                    expected_pairwise_allocation_matrix_engine2(
-                        n_samples,
-                        n_items,
-                        Some(lower..upper),
-                        partitions,
-                        counts2,
-                    );
+                    engine2(n_samples, n_items, Some(lower..upper), partitions, counts2);
                 });
             }
         })
@@ -102,7 +87,7 @@ where
     }
 }
 
-pub fn expected_pairwise_allocation_matrix_engine2<A>(
+fn engine2<A>(
     n_samples: usize,
     n_items: usize,
     range: Option<std::ops::Range<usize>>,
@@ -139,7 +124,7 @@ where
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_partition__summary__epam__expected_pairwise_allocation_matrix(
+pub unsafe extern "C" fn dahl_partition__summary__epam(
     n_samples: c_int,
     n_items: c_int,
     parallel: c_int,
@@ -150,5 +135,5 @@ pub unsafe extern "C" fn dahl_partition__summary__epam__expected_pairwise_alloca
     let ni = n_items as usize;
     let partitions: &[c_int] = slice::from_raw_parts(partitions_ptr, ns * ni);
     let counts: &mut [c_double] = slice::from_raw_parts_mut(counts_ptr, ni * ni);
-    expected_pairwise_allocation_matrix_engine(ns, ni, parallel != 0, partitions, counts);
+    engine(ns, ni, parallel != 0, partitions, counts);
 }
