@@ -44,7 +44,7 @@ mod tests {
         for _ in 0..n_samples {
             samples.push(sample(n_items, mass));
         }
-        let epam = expected_pairwise_allocation_matrix(&samples);
+        let epam = expected_pairwise_allocation_matrix(&samples, true);
         let truth = 1.0 / (1.0 + mass);
         let margin_of_error = 3.58 * (truth * (1.0 - truth) / n_samples as f64).sqrt();
         assert!(epam.iter().all(|prob| {
