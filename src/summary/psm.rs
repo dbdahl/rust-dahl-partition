@@ -101,20 +101,20 @@ where
     let indices = range.unwrap_or(0..n_items);
     for j in indices {
         let nsj = n_samples * j;
-        for k in 0..j {
-            let nsk = n_samples * k;
+        for i in 0..j {
+            let nsi = n_samples * i;
             let mut count = 0usize;
-            for i in 0..n_samples {
+            for k in 0..n_samples {
                 unsafe {
-                    if partitions.get_unchecked(nsj + i) == partitions.get_unchecked(nsk + i) {
+                    if partitions.get_unchecked(nsj + k) == partitions.get_unchecked(nsi + k) {
                         count += 1;
                     }
                 }
             }
             let proportion = count as f64 / nsf;
             unsafe {
-                *counts.get_unchecked_mut(n_items * j + k) = proportion;
-                *counts.get_unchecked_mut(n_items * k + j) = proportion;
+                *counts.get_unchecked_mut(n_items * j + i) = proportion;
+                *counts.get_unchecked_mut(n_items * i + j) = proportion;
             }
         }
         unsafe {
