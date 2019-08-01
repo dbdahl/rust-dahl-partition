@@ -63,17 +63,34 @@ where
     if !parallel {
         expected_pairwise_allocation_matrix_engine2(n_samples, n_items, None, partitions, counts);
     } else {
-        println!("************** Parallel");
-        let schedule: Vec<usize> = (0..n_items).collect();
+        let n_cores = 8usize;
+        let n_pairs = n_items * (n_items - 1) / 2;
+        let step_size = n_pairs / n_cores + 1;
+        let mut s = 0usize;
+        let mut plan = Vec::with_capacity(n_cores + 1);
+        plan.push(0);
+        for i in 0..n_items {
+            if s > step_size {
+                plan.push(i);
+                s = 0;
+            }
+            s += i;
+        }
+        while plan.len() < n_cores + 1 {
+            plan.push(n_items);
+        }
+        println!("{:?}", plan);
         crossbeam::scope(|s| {
-            for i in schedule {
+            for i in 0..n_cores {
                 let counts2 =
                     unsafe { slice::from_raw_parts_mut(counts.as_mut_ptr(), counts.len()) };
+                let lower = plan[i];
+                let upper = plan[i + 1];
                 s.spawn(move |_| {
                     expected_pairwise_allocation_matrix_engine2(
                         n_samples,
                         n_items,
-                        Some(i..(i + 1)),
+                        Some(lower..upper),
                         partitions,
                         counts2,
                     );
@@ -81,23 +98,6 @@ where
             }
         })
         .unwrap();
-        /*
-        let mut handles = Vec::with_capacity(n_items);
-        for i in 0..n_items {
-            handles[i] = {
-                thread::spawn(|| {
-                    expected_pairwise_allocation_matrix_engine2(
-                        n_samples,
-                        n_items,
-                        Some(0..(n_items / 2)),
-                        partitions,
-                        counts,
-                    );
-                })
-            }
-        }
-        handles.iter_mut().for_each(|handle| handle.join().unwrap());
-        */
     }
 }
 
