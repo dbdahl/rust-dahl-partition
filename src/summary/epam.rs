@@ -1,3 +1,5 @@
+extern crate num_cpus;
+
 use crate::*;
 use std::os::raw::{c_double, c_int};
 use std::slice;
@@ -63,7 +65,7 @@ where
     if !parallel {
         expected_pairwise_allocation_matrix_engine2(n_samples, n_items, None, partitions, counts);
     } else {
-        let n_cores = 8usize;
+        let n_cores = num_cpus::get();
         let n_pairs = n_items * (n_items - 1) / 2;
         let step_size = n_pairs / n_cores + 1;
         let mut s = 0usize;
@@ -79,7 +81,6 @@ where
         while plan.len() < n_cores + 1 {
             plan.push(n_items);
         }
-        println!("{:?}", plan);
         crossbeam::scope(|s| {
             for i in 0..n_cores {
                 let counts2 =
