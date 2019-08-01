@@ -715,3 +715,39 @@ mod tests_subset {
         assert_ne!(s1, s3);
     }
 }
+
+/// A data structure representing a pairwise similarity matrix.
+///
+pub struct PairwiseSimilarityMatrix<'a> {
+    n_items: usize,
+    data: &'a mut [f64],
+}
+
+impl std::ops::Index<(usize, usize)> for PairwiseSimilarityMatrix<'_> {
+    type Output = f64;
+    fn index(&self, (i, j): (usize, usize)) -> &Self::Output {
+        &self.data[self.n_items * j + i]
+    }
+}
+
+use std::os::raw::c_double;
+use std::slice;
+
+impl<'a> PairwiseSimilarityMatrix<'a> {
+    pub unsafe fn from_ptr(data: *mut c_double, n_items: usize) -> PairwiseSimilarityMatrix<'a> {
+        let data = slice::from_raw_parts_mut(data, n_items * n_items);
+        PairwiseSimilarityMatrix { data, n_items }
+    }
+
+    pub fn n_items(&self) -> usize {
+        self.n_items
+    }
+
+    pub unsafe fn get_unchecked(&self, (i, j): (usize, usize)) -> &f64 {
+        self.data.get_unchecked(self.n_items * j + i)
+    }
+
+    pub unsafe fn get_unchecked_mut(&mut self, (i, j): (usize, usize)) -> &mut f64 {
+        self.data.get_unchecked_mut(self.n_items * j + i)
+    }
+}
