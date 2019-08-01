@@ -1,7 +1,6 @@
 use crate::*;
 use std::os::raw::{c_double, c_int};
 use std::slice;
-use std::thread;
 
 pub fn expected_pairwise_allocation_matrix(
     partitions: &Vec<Partition>,
@@ -64,7 +63,24 @@ where
     if !parallel {
         expected_pairwise_allocation_matrix_engine2(n_samples, n_items, None, partitions, counts);
     } else {
-        expected_pairwise_allocation_matrix_engine2(n_samples, n_items, None, partitions, counts);
+        println!("************** Parallel");
+        let schedule: Vec<usize> = (0..n_items).collect();
+        crossbeam::scope(|s| {
+            for i in schedule {
+                let counts2 =
+                    unsafe { slice::from_raw_parts_mut(counts.as_mut_ptr(), counts.len()) };
+                s.spawn(move |_| {
+                    expected_pairwise_allocation_matrix_engine2(
+                        n_samples,
+                        n_items,
+                        Some(i..(i + 1)),
+                        partitions,
+                        counts2,
+                    );
+                });
+            }
+        })
+        .unwrap();
         /*
         let mut handles = Vec::with_capacity(n_items);
         for i in 0..n_items {
