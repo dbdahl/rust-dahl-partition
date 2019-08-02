@@ -716,27 +716,53 @@ mod tests_subset {
     }
 }
 
+pub struct PairwiseSimilarityMatrix(Vec<f64>, usize);
+
+impl PairwiseSimilarityMatrix {
+    pub fn new(n_items: usize) -> PairwiseSimilarityMatrix {
+        PairwiseSimilarityMatrix(vec![1.0; n_items * n_items], n_items)
+    }
+
+    pub fn view(&mut self) -> PairwiseSimilarityMatrixView {
+        PairwiseSimilarityMatrixView::from_slice(&mut self.0[..], self.1)
+    }
+}
+
 /// A data structure representing a pairwise similarity matrix.
 ///
-pub struct PairwiseSimilarityMatrix<'a> {
+pub struct PairwiseSimilarityMatrixView<'a> {
     n_items: usize,
     data: &'a mut [f64],
 }
 
-impl std::ops::Index<(usize, usize)> for PairwiseSimilarityMatrix<'_> {
+impl std::ops::Index<(usize, usize)> for PairwiseSimilarityMatrixView<'_> {
     type Output = f64;
     fn index(&self, (i, j): (usize, usize)) -> &Self::Output {
         &self.data[self.n_items * j + i]
     }
 }
 
+impl std::ops::IndexMut<(usize, usize)> for PairwiseSimilarityMatrixView<'_> {
+    fn index_mut(&mut self, (i, j): (usize, usize)) -> &mut Self::Output {
+        &mut self.data[self.n_items * j + i]
+    }
+}
+
 use std::os::raw::c_double;
 use std::slice;
 
-impl<'a> PairwiseSimilarityMatrix<'a> {
-    pub unsafe fn from_ptr(data: *mut c_double, n_items: usize) -> PairwiseSimilarityMatrix<'a> {
+impl<'a> PairwiseSimilarityMatrixView<'a> {
+    pub fn from_slice(data: &'a mut [f64], n_items: usize) -> PairwiseSimilarityMatrixView<'a> {
+        assert_eq!(data.len(), n_items * n_items);
+        PairwiseSimilarityMatrixView { data, n_items }
+    }
+
+    pub unsafe fn from_ptr(
+        data: *mut c_double,
+        n_items: usize,
+    ) -> PairwiseSimilarityMatrixView<'a> {
         let data = slice::from_raw_parts_mut(data, n_items * n_items);
-        PairwiseSimilarityMatrix { data, n_items }
+        PairwiseSimilarityMatrixView { data, n_items }
     }
 
     pub fn n_items(&self) -> usize {

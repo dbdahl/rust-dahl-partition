@@ -44,10 +44,10 @@ mod tests {
         for _ in 0..n_samples {
             samples.push(sample(n_items, mass));
         }
-        let epam = psm(&samples, true);
+        let mut psm = psm(&samples, true);
         let truth = 1.0 / (1.0 + mass);
         let margin_of_error = 3.58 * (truth * (1.0 - truth) / n_samples as f64).sqrt();
-        assert!(epam.iter().all(|prob| {
+        assert!(psm.view().data.iter().all(|prob| {
             *prob == 1.0 || (truth - margin_of_error < *prob && *prob < truth + margin_of_error)
         }));
     }

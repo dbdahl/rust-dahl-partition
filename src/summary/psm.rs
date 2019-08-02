@@ -4,7 +4,7 @@ use crate::*;
 use std::os::raw::{c_double, c_int};
 use std::slice;
 
-pub fn psm(partitions: &Vec<Partition>, parallel: bool) -> Vec<f64> {
+pub fn psm(partitions: &Vec<Partition>, parallel: bool) -> PairwiseSimilarityMatrix {
     let n_samples = partitions.len();
     assert!(
         n_samples > 0,
@@ -21,9 +21,9 @@ pub fn psm(partitions: &Vec<Partition>, parallel: bool) -> Vec<f64> {
             labels[n_samples * j + i] = *value;
         }
     }
-    let mut counts = vec![0.0; n_items * n_items];
-    engine(n_samples, n_items, parallel, &labels[..], &mut counts[..]);
-    counts
+    let mut psm = PairwiseSimilarityMatrix::new(n_items);
+    engine(n_samples, n_items, parallel, &labels[..], &mut psm.view());
+    psm
 }
 
 #[cfg(test)]
@@ -37,8 +37,10 @@ mod tests {
         partitions.push(Partition::from("AAAB".as_bytes()));
         partitions.push(Partition::from("ABBB".as_bytes()));
         partitions.push(Partition::from("AAAB".as_bytes()));
-        let psm = psm(&partitions, true);
-        assert_eq!(format!("{:?}", psm), "[1.0, 0.75, 0.5, 0.0, 0.75, 1.0, 0.75, 0.25, 0.5, 0.75, 1.0, 0.5, 0.0, 0.25, 0.5, 1.0]");
+        let mut psm1 = psm(&partitions, true);
+        assert_eq!(format!("{:?}", psm1.view().data), "[1.0, 0.75, 0.5, 0.0, 0.75, 1.0, 0.75, 0.25, 0.5, 0.75, 1.0, 0.5, 0.0, 0.25, 0.5, 1.0]");
+        let mut psm2 = psm(&partitions, false);
+        assert_eq!(format!("{:?}", psm2.view().data), "[1.0, 0.75, 0.5, 0.0, 0.75, 1.0, 0.75, 0.25, 0.5, 0.75, 1.0, 0.5, 0.0, 0.25, 0.5, 1.0]");
     }
 
 }
@@ -48,13 +50,13 @@ fn engine<A>(
     n_items: usize,
     parallel: bool,
     partitions: &[A],
-    counts: &mut [f64],
+    view: &mut PairwiseSimilarityMatrixView,
 ) -> ()
 where
     A: PartialEq + Sync + Send,
 {
     if !parallel {
-        engine2(n_samples, n_items, None, partitions, counts);
+        engine2(n_samples, n_items, None, partitions, view);
     } else {
         let n_cores = num_cpus::get();
         let n_pairs = n_items * (n_items - 1) / 2;
@@ -74,12 +76,13 @@ where
         }
         crossbeam::scope(|s| {
             for i in 0..n_cores {
-                let counts2 =
-                    unsafe { slice::from_raw_parts_mut(counts.as_mut_ptr(), counts.len()) };
+                let ptr =
+                    unsafe { slice::from_raw_parts_mut(view.data.as_mut_ptr(), view.data.len()) };
                 let lower = plan[i];
                 let upper = plan[i + 1];
                 s.spawn(move |_| {
-                    engine2(n_samples, n_items, Some(lower..upper), partitions, counts2);
+                    let view2 = &mut PairwiseSimilarityMatrixView::from_slice(ptr, n_items);
+                    engine2(n_samples, n_items, Some(lower..upper), partitions, view2);
                 });
             }
         })
@@ -92,7 +95,7 @@ fn engine2<A>(
     n_items: usize,
     range: Option<std::ops::Range<usize>>,
     partitions: &[A],
-    counts: &mut [f64],
+    view: &mut PairwiseSimilarityMatrixView,
 ) -> ()
 where
     A: PartialEq,
@@ -113,12 +116,12 @@ where
             }
             let proportion = count as f64 / nsf;
             unsafe {
-                *counts.get_unchecked_mut(n_items * j + i) = proportion;
-                *counts.get_unchecked_mut(n_items * i + j) = proportion;
+                *view.get_unchecked_mut((i, j)) = proportion;
+                *view.get_unchecked_mut((j, i)) = proportion;
             }
         }
         unsafe {
-            *counts.get_unchecked_mut(n_items * j + j) = 1.0;
+            *view.get_unchecked_mut((j, j)) = 1.0;
         }
     }
 }
@@ -129,11 +132,11 @@ pub unsafe extern "C" fn dahl_partition__summary__psm(
     n_items: c_int,
     parallel: c_int,
     partitions_ptr: *const c_int,
-    counts_ptr: *mut c_double,
+    psm_ptr: *mut c_double,
 ) -> () {
     let ns = n_samples as usize;
     let ni = n_items as usize;
     let partitions: &[c_int] = slice::from_raw_parts(partitions_ptr, ns * ni);
-    let counts: &mut [c_double] = slice::from_raw_parts_mut(counts_ptr, ni * ni);
-    engine(ns, ni, parallel != 0, partitions, counts);
+    let mut view = PairwiseSimilarityMatrixView::from_ptr(psm_ptr, ni);
+    engine(ns, ni, parallel != 0, partitions, &mut view);
 }

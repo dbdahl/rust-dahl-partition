@@ -2,7 +2,7 @@ use crate::*;
 use std::os::raw::{c_double, c_int};
 use std::slice;
 
-pub fn binder<A>(partition: &[A], psm: &PairwiseSimilarityMatrix) -> f64
+pub fn binder<A>(partition: &[A], psm: &PairwiseSimilarityMatrixView) -> f64
 where
     A: PartialEq,
 {
@@ -29,6 +29,6 @@ pub unsafe extern "C" fn dahl_partition__summary__binder(
 ) -> f64 {
     let ni = n_items as usize;
     let partition: &[c_int] = slice::from_raw_parts(partition_ptr, ni);
-    let psm = PairwiseSimilarityMatrix::from_ptr(psm_ptr, ni);
+    let psm = PairwiseSimilarityMatrixView::from_ptr(psm_ptr, ni);
     binder(partition, &psm)
 }
