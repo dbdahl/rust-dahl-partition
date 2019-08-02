@@ -716,23 +716,29 @@ mod tests_subset {
     }
 }
 
-pub struct PairwiseSimilarityMatrix(Vec<f64>, usize);
+/// A data structure representing a pairwise similarity matrix.
+///
+pub struct PairwiseSimilarityMatrix {
+    data: Vec<f64>,
+    n_items: usize,
+}
 
 impl PairwiseSimilarityMatrix {
     pub fn new(n_items: usize) -> PairwiseSimilarityMatrix {
-        PairwiseSimilarityMatrix(vec![1.0; n_items * n_items], n_items)
+        PairwiseSimilarityMatrix {
+            data: vec![1.0; n_items * n_items],
+            n_items,
+        }
     }
 
     pub fn view(&mut self) -> PairwiseSimilarityMatrixView {
-        PairwiseSimilarityMatrixView::from_slice(&mut self.0[..], self.1)
+        PairwiseSimilarityMatrixView::from_slice(&mut self.data[..], self.n_items)
     }
 }
 
-/// A data structure representing a pairwise similarity matrix.
-///
 pub struct PairwiseSimilarityMatrixView<'a> {
-    n_items: usize,
     data: &'a mut [f64],
+    n_items: usize,
 }
 
 impl std::ops::Index<(usize, usize)> for PairwiseSimilarityMatrixView<'_> {
