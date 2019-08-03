@@ -2,33 +2,44 @@ use crate::*;
 use std::os::raw::{c_double, c_int};
 use std::slice;
 
-pub fn binder<A>(partition: &[A], psm: &PairwiseSimilarityMatrixView) -> f64
-where
+pub fn binder<A>(
+    partitions: &PartitionsHolderView<A>,
+    psm: &PairwiseSimilarityMatrixView,
+    results: &mut [f64],
+) where
     A: PartialEq,
 {
     let ni = psm.n_items();
-    let mut sum = 0.0;
-    for j in 0..ni {
-        for i in 0..j {
-            let p = unsafe { *psm.get_unchecked((i, j)) };
-            sum += if unsafe { *partition.get_unchecked(i) == *partition.get_unchecked(j) } {
-                1.0 - p
-            } else {
-                p
+    for k in 0..partitions.n_samples {
+        let mut sum = 0.0;
+        for j in 0..ni {
+            for i in 0..j {
+                let p = unsafe { *psm.get_unchecked((i, j)) };
+                sum += if unsafe {
+                    *partitions.get_unchecked((k, i)) == *partitions.get_unchecked((k, j))
+                } {
+                    1.0 - p
+                } else {
+                    p
+                }
             }
         }
+        unsafe { *results.get_unchecked_mut(k) = sum };
     }
-    sum
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn dahl_partition__summary__binder(
+    n_samples: c_int,
     n_items: c_int,
     partition_ptr: *const c_int,
     psm_ptr: *mut c_double,
-) -> f64 {
+    results_ptr: *mut c_double,
+) {
+    let ns = n_samples as usize;
     let ni = n_items as usize;
-    let partition: &[c_int] = slice::from_raw_parts(partition_ptr, ni);
+    let partitions = PartitionsHolderView::from_ptr(partition_ptr, ns, ni, true);
     let psm = PairwiseSimilarityMatrixView::from_ptr(psm_ptr, ni);
-    binder(partition, &psm)
+    let results = slice::from_raw_parts_mut(results_ptr, ns);
+    binder(&partitions, &psm, results);
 }

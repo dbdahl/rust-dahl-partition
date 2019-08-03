@@ -31,9 +31,9 @@ mod tests {
         partitions.push(Partition::from("ABBB".as_bytes()));
         partitions.push(Partition::from("AAAB".as_bytes()));
         let partitions_view = partitions.view();
-        let mut psm1 = psm(&partitions_view, true);
+        let psm1 = psm(&partitions_view, true);
         assert_eq!(format!("{:?}", psm1.data), "[1.0, 0.75, 0.5, 0.0, 0.75, 1.0, 0.75, 0.25, 0.5, 0.75, 1.0, 0.5, 0.0, 0.25, 0.5, 1.0]");
-        let mut psm2 = psm(&partitions_view, false);
+        let psm2 = psm(&partitions_view, false);
         assert_eq!(format!("{:?}", psm2.data), "[1.0, 0.75, 0.5, 0.0, 0.75, 1.0, 0.75, 0.25, 0.5, 0.75, 1.0, 0.5, 0.0, 0.25, 0.5, 1.0]");
     }
 
