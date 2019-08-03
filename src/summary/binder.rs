@@ -2,9 +2,19 @@ use crate::*;
 use std::os::raw::{c_double, c_int};
 use std::slice;
 
-pub fn binder<A>(
+pub fn binder_paired(p: f64) -> f64 {
+    1.0 - p
+}
+
+pub fn binder_unpaired(p: f64) -> f64 {
+    p
+}
+
+pub fn expected_loss<A>(
     partitions: &PartitionsHolderView<A>,
     psm: &PairwiseSimilarityMatrixView,
+    paired: fn(f64) -> f64,
+    unpaired: fn(f64) -> f64,
     results: &mut [f64],
 ) where
     A: PartialEq,
@@ -18,9 +28,9 @@ pub fn binder<A>(
                 sum += if unsafe {
                     *partitions.get_unchecked((k, i)) == *partitions.get_unchecked((k, j))
                 } {
-                    1.0 - p
+                    paired(p)
                 } else {
-                    p
+                    unpaired(p)
                 }
             }
         }
@@ -43,8 +53,8 @@ pub unsafe extern "C" fn dahl_partition__summary__expected_loss(
     let psm = PairwiseSimilarityMatrixView::from_ptr(psm_ptr, ni);
     let results = slice::from_raw_parts_mut(results_ptr, ns);
     match loss {
-        0 => binder(&partitions, &psm, results),
-        //1 => vilb(&partitions, &psm, results),
+        0 => expected_loss(&partitions, &psm, binder_paired, binder_unpaired, results),
+        0 => expected_loss(&partitions, &psm, binder_paired, binder_unpaired, results),
         _ => panic!("Unsupported loss method: {}", loss),
     };
 }
