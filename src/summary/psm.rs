@@ -44,13 +44,13 @@ fn engine<A>(
     n_items: usize,
     parallel: bool,
     partitions: &PartitionsHolderView<A>,
-    view: &mut PairwiseSimilarityMatrixView,
+    psm: &mut PairwiseSimilarityMatrixView,
 ) -> ()
 where
     A: PartialEq + Sync + Send,
 {
     if !parallel {
-        engine2(n_samples, n_items, None, partitions, view);
+        engine2(n_samples, n_items, None, partitions, psm);
     } else {
         let n_cores = num_cpus::get();
         let n_pairs = n_items * (n_items - 1) / 2;
@@ -71,12 +71,12 @@ where
         crossbeam::scope(|s| {
             for i in 0..n_cores {
                 let ptr =
-                    unsafe { slice::from_raw_parts_mut(view.data.as_mut_ptr(), view.data.len()) };
+                    unsafe { slice::from_raw_parts_mut(psm.data.as_mut_ptr(), psm.data.len()) };
                 let lower = plan[i];
                 let upper = plan[i + 1];
                 s.spawn(move |_| {
-                    let view2 = &mut PairwiseSimilarityMatrixView::from_slice(ptr, n_items);
-                    engine2(n_samples, n_items, Some(lower..upper), partitions, view2);
+                    let psm2 = &mut PairwiseSimilarityMatrixView::from_slice(ptr, n_items);
+                    engine2(n_samples, n_items, Some(lower..upper), partitions, psm2);
                 });
             }
         })
@@ -89,7 +89,7 @@ fn engine2<A>(
     n_items: usize,
     range: Option<std::ops::Range<usize>>,
     partitions: &PartitionsHolderView<A>,
-    view: &mut PairwiseSimilarityMatrixView,
+    psm: &mut PairwiseSimilarityMatrixView,
 ) -> ()
 where
     A: PartialEq,
@@ -108,12 +108,12 @@ where
             }
             let proportion = count as f64 / nsf;
             unsafe {
-                *view.get_unchecked_mut((i, j)) = proportion;
-                *view.get_unchecked_mut((j, i)) = proportion;
+                *psm.get_unchecked_mut((i, j)) = proportion;
+                *psm.get_unchecked_mut((j, i)) = proportion;
             }
         }
         unsafe {
-            *view.get_unchecked_mut((j, j)) = 1.0;
+            *psm.get_unchecked_mut((j, j)) = 1.0;
         }
     }
 }
@@ -128,7 +128,7 @@ pub unsafe extern "C" fn dahl_partition__summary__psm(
 ) -> () {
     let ns = n_samples as usize;
     let ni = n_items as usize;
-    let partitions_view = PartitionsHolderView::from_ptr(partitions_ptr, ns, ni, true);
-    let mut view = PairwiseSimilarityMatrixView::from_ptr(psm_ptr, ni);
-    engine(ns, ni, parallel != 0, &partitions_view, &mut view);
+    let partitions = PartitionsHolderView::from_ptr(partitions_ptr, ns, ni, true);
+    let mut psm = PairwiseSimilarityMatrixView::from_ptr(psm_ptr, ni);
+    engine(ns, ni, parallel != 0, &partitions, &mut psm);
 }
