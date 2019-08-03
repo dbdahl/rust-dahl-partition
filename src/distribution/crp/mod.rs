@@ -34,17 +34,18 @@ pub fn sample(n_items: usize, mass: f64) -> Partition {
 mod tests {
     use super::*;
     use crate::summary::psm;
+    use crate::PartitionsHolder;
 
     #[test]
     fn test_sample() {
         let n_samples = 10000;
         let n_items = 4;
         let mass = 2.0;
-        let mut samples = Vec::with_capacity(n_samples);
+        let mut samples = PartitionsHolder::with_capacity(n_samples, n_items);
         for _ in 0..n_samples {
             samples.push(sample(n_items, mass));
         }
-        let mut psm = psm(&samples, true);
+        let mut psm = psm(&samples.view(), true);
         let truth = 1.0 / (1.0 + mass);
         let margin_of_error = 3.58 * (truth * (1.0 - truth) / n_samples as f64).sqrt();
         assert!(psm.view().data.iter().all(|prob| {

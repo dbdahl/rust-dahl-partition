@@ -4,25 +4,18 @@ use crate::*;
 use std::os::raw::{c_double, c_int};
 use std::slice;
 
-pub fn psm(partitions: &Vec<Partition>, parallel: bool) -> PairwiseSimilarityMatrix {
-    let n_samples = partitions.len();
-    assert!(
-        n_samples > 0,
-        "Number of partitions must be greater than 0.",
+pub fn psm<A>(partitions: &PartitionsHolderView<A>, parallel: bool) -> PairwiseSimilarityMatrix
+where
+    A: PartialEq + Sync + Send,
+{
+    let mut psm = PairwiseSimilarityMatrix::new(partitions.n_items());
+    engine(
+        partitions.n_samples(),
+        partitions.n_items(),
+        parallel,
+        partitions,
+        &mut psm.view(),
     );
-    let n_items = partitions[0].n_items();
-    assert!(
-        partitions.iter().all(|x| n_items == x.n_items()),
-        "All partitions must be of the same length."
-    );
-    let mut labels = vec![0usize; n_samples * n_items];
-    for (i, partition) in partitions.iter().enumerate() {
-        for (j, value) in partition.labels().iter().enumerate() {
-            labels[n_samples * j + i] = *value;
-        }
-    }
-    let mut psm = PairwiseSimilarityMatrix::new(n_items);
-    engine(n_samples, n_items, parallel, &labels[..], &mut psm.view());
     psm
 }
 
@@ -32,14 +25,15 @@ mod tests {
 
     #[test]
     fn test_psm() {
-        let mut partitions = Vec::new();
+        let mut partitions = PartitionsHolder::new(4);
         partitions.push(Partition::from("AABB".as_bytes()));
         partitions.push(Partition::from("AAAB".as_bytes()));
         partitions.push(Partition::from("ABBB".as_bytes()));
         partitions.push(Partition::from("AAAB".as_bytes()));
-        let mut psm1 = psm(&partitions, true);
+        let partitions_view = partitions.view();
+        let mut psm1 = psm(&partitions_view, true);
         assert_eq!(format!("{:?}", psm1.data), "[1.0, 0.75, 0.5, 0.0, 0.75, 1.0, 0.75, 0.25, 0.5, 0.75, 1.0, 0.5, 0.0, 0.25, 0.5, 1.0]");
-        let mut psm2 = psm(&partitions, false);
+        let mut psm2 = psm(&partitions_view, false);
         assert_eq!(format!("{:?}", psm2.data), "[1.0, 0.75, 0.5, 0.0, 0.75, 1.0, 0.75, 0.25, 0.5, 0.75, 1.0, 0.5, 0.0, 0.25, 0.5, 1.0]");
     }
 
@@ -49,7 +43,7 @@ fn engine<A>(
     n_samples: usize,
     n_items: usize,
     parallel: bool,
-    partitions: &[A],
+    partitions: &PartitionsHolderView<A>,
     view: &mut PairwiseSimilarityMatrixView,
 ) -> ()
 where
@@ -94,7 +88,7 @@ fn engine2<A>(
     n_samples: usize,
     n_items: usize,
     range: Option<std::ops::Range<usize>>,
-    partitions: &[A],
+    partitions: &PartitionsHolderView<A>,
     view: &mut PairwiseSimilarityMatrixView,
 ) -> ()
 where
@@ -103,13 +97,11 @@ where
     let nsf = n_samples as f64;
     let indices = range.unwrap_or(0..n_items);
     for j in indices {
-        let nsj = n_samples * j;
         for i in 0..j {
-            let nsi = n_samples * i;
             let mut count = 0usize;
             for k in 0..n_samples {
                 unsafe {
-                    if partitions.get_unchecked(nsj + k) == partitions.get_unchecked(nsi + k) {
+                    if partitions.get_unchecked((k, i)) == partitions.get_unchecked((k, j)) {
                         count += 1;
                     }
                 }
@@ -136,7 +128,7 @@ pub unsafe extern "C" fn dahl_partition__summary__psm(
 ) -> () {
     let ns = n_samples as usize;
     let ni = n_items as usize;
-    let partitions: &[c_int] = slice::from_raw_parts(partitions_ptr, ns * ni);
+    let partitions_view = PartitionsHolderView::from_ptr(partitions_ptr, ns, ni, true);
     let mut view = PairwiseSimilarityMatrixView::from_ptr(psm_ptr, ni);
-    engine(ns, ni, parallel != 0, partitions, &mut view);
+    engine(ns, ni, parallel != 0, &partitions_view, &mut view);
 }

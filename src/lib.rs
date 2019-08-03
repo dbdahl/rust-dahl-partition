@@ -6,8 +6,11 @@ pub mod summary;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::convert::TryFrom;
 use std::fmt;
 use std::hash::Hash;
+use std::os::raw::{c_double, c_int};
+use std::slice;
 
 /// A partition of `n_items` is a set of subsets such that the subsets are mutually exclusive,
 /// nonempty, and exhaustive.  This data structure enforces mutually exclusivity and provides
@@ -754,9 +757,6 @@ impl std::ops::IndexMut<(usize, usize)> for PairwiseSimilarityMatrixView<'_> {
     }
 }
 
-use std::os::raw::c_double;
-use std::slice;
-
 impl<'a> PairwiseSimilarityMatrixView<'a> {
     pub fn from_slice(data: &'a mut [f64], n_items: usize) -> PairwiseSimilarityMatrixView<'a> {
         assert_eq!(data.len(), n_items * n_items);
@@ -781,5 +781,132 @@ impl<'a> PairwiseSimilarityMatrixView<'a> {
 
     pub unsafe fn get_unchecked_mut(&mut self, (i, j): (usize, usize)) -> &mut f64 {
         self.data.get_unchecked_mut(self.n_items * j + i)
+    }
+}
+
+/// A data structure representing a pairwise similarity matrix.
+///
+pub struct PartitionsHolder {
+    data: Vec<u16>,
+    n_samples: usize,
+    n_items: usize,
+    by_row: bool,
+}
+
+impl PartitionsHolder {
+    pub fn new(n_items: usize) -> PartitionsHolder {
+        PartitionsHolder {
+            data: Vec::new(),
+            n_samples: 0,
+            n_items,
+            by_row: false,
+        }
+    }
+
+    pub fn with_capacity(capacity: usize, n_items: usize) -> PartitionsHolder {
+        PartitionsHolder {
+            data: Vec::with_capacity(capacity * n_items),
+            n_samples: 0,
+            n_items,
+            by_row: false,
+        }
+    }
+
+    pub fn push(&mut self, partition: Partition) {
+        assert_eq!(partition.n_items(), self.n_items);
+        for i in partition.labels_with_missing() {
+            self.data.push(u16::try_from(i.unwrap()).unwrap())
+        }
+        self.n_samples += 1
+    }
+
+    pub fn view(&mut self) -> PartitionsHolderView<u16> {
+        PartitionsHolderView::from_slice(
+            &mut self.data[..],
+            self.n_samples,
+            self.n_items,
+            self.by_row,
+        )
+    }
+}
+
+pub struct PartitionsHolderView<'a, T>
+where
+    T: PartialEq,
+{
+    data: &'a [T],
+    n_samples: usize,
+    n_items: usize,
+    by_row: bool,
+}
+
+impl<T> std::ops::Index<(usize, usize)> for PartitionsHolderView<'_, T>
+where
+    T: PartialEq,
+{
+    type Output = T;
+    fn index(&self, (i, j): (usize, usize)) -> &Self::Output {
+        if self.by_row {
+            &self.data[self.n_samples * j + i]
+        } else {
+            &self.data[self.n_items * i + j]
+        }
+    }
+}
+
+impl<'a, T> PartitionsHolderView<'a, T>
+where
+    T: PartialEq,
+{
+    pub fn from_slice(
+        data: &'a [T],
+        n_samples: usize,
+        n_items: usize,
+        by_row: bool,
+    ) -> PartitionsHolderView<'a, T> {
+        assert_eq!(data.len(), n_samples * n_items);
+        PartitionsHolderView {
+            data,
+            n_samples,
+            n_items,
+            by_row,
+        }
+    }
+
+    pub fn n_samples(&self) -> usize {
+        self.n_samples
+    }
+
+    pub fn n_items(&self) -> usize {
+        self.n_items
+    }
+
+    pub fn by_row(&self) -> bool {
+        self.by_row
+    }
+
+    pub unsafe fn get_unchecked(&self, (i, j): (usize, usize)) -> &T {
+        if self.by_row {
+            self.data.get_unchecked(self.n_samples * j + i)
+        } else {
+            self.data.get_unchecked(self.n_items * i + j)
+        }
+    }
+}
+
+impl<'a> PartitionsHolderView<'a, c_int> {
+    pub unsafe fn from_ptr(
+        data: *const c_int,
+        n_samples: usize,
+        n_items: usize,
+        by_row: bool,
+    ) -> PartitionsHolderView<'a, c_int> {
+        let data = slice::from_raw_parts(data, n_samples * n_items);
+        PartitionsHolderView {
+            data,
+            n_samples,
+            n_items,
+            by_row,
+        }
     }
 }
