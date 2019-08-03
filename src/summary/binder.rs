@@ -29,11 +29,12 @@ pub fn binder<A>(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dahl_partition__summary__binder(
+pub unsafe extern "C" fn dahl_partition__summary__expected_loss(
     n_samples: c_int,
     n_items: c_int,
     partition_ptr: *const c_int,
     psm_ptr: *mut c_double,
+    loss: c_int,
     results_ptr: *mut c_double,
 ) {
     let ns = n_samples as usize;
@@ -41,5 +42,9 @@ pub unsafe extern "C" fn dahl_partition__summary__binder(
     let partitions = PartitionsHolderView::from_ptr(partition_ptr, ns, ni, true);
     let psm = PairwiseSimilarityMatrixView::from_ptr(psm_ptr, ni);
     let results = slice::from_raw_parts_mut(results_ptr, ns);
-    binder(&partitions, &psm, results);
+    match loss {
+        0 => binder(&partitions, &psm, results),
+        //1 => vilb(&partitions, &psm, results),
+        _ => panic!("Unsupported loss method: {}", loss),
+    };
 }
