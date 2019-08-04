@@ -50,7 +50,7 @@ pub fn vilb<A>(
     for k in 0..partitions.n_samples {
         let mut sum = sum2;
         for i in 0..ni {
-            let mut s1 = 0u16;
+            let mut s1 = 0u32;
             let mut s2 = 0.0;
             for j in 0..ni {
                 if unsafe { *partitions.get_unchecked((k, i)) == *partitions.get_unchecked((k, j)) }
