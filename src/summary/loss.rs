@@ -36,21 +36,30 @@ pub fn vilb<A>(
     A: PartialEq,
 {
     let ni = psm.n_items();
+    let sum2 = {
+        let mut s1 = 0.0;
+        for i in 0..ni {
+            let mut s2 = 0.0;
+            for j in 0..ni {
+                s2 += unsafe { *psm.get_unchecked((i, j)) };
+            }
+            s1 += s2.log2()
+        }
+        s1
+    };
     for k in 0..partitions.n_samples {
-        let mut sum = 0.0;
+        let mut sum = sum2;
         for i in 0..ni {
             let mut s1 = 0u16;
             let mut s2 = 0.0;
-            let mut s3 = 0.0;
             for j in 0..ni {
                 if unsafe { *partitions.get_unchecked((k, i)) == *partitions.get_unchecked((k, j)) }
                 {
                     s1 += 1;
                     s2 += unsafe { *psm.get_unchecked((i, j)) };
                 }
-                s3 += unsafe { *psm.get_unchecked((i, j)) };
             }
-            sum += f64::from(s1).log2() + s3.log2() - 2.0 * s2.log2();
+            sum += f64::from(s1).log2() - 2.0 * s2.log2();
         }
         unsafe { *results.get_unchecked_mut(k) = sum / (psm.n_items as f64) };
     }
