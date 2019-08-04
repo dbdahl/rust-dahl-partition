@@ -1,5 +1,6 @@
-pub mod binder;
+pub mod loss;
 pub mod psm;
 
-pub use binder::expected_loss;
+pub use loss::binder;
+pub use loss::vilb;
 pub use psm::psm;
