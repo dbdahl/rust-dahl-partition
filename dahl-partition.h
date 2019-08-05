@@ -17,3 +17,5 @@ void dahl_partition__summary__psm(int n_samples,
                                   int parallel,
                                   const int *partitions_ptr,
                                   double *psm_ptr);
+
+double dahl_partition__utils__lbell(int n);

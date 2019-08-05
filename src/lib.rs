@@ -2,6 +2,7 @@
 
 pub mod distribution;
 pub mod summary;
+pub mod utils;
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
