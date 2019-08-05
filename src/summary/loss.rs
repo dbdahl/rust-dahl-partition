@@ -69,7 +69,7 @@ pub fn vilb<A>(
 pub unsafe extern "C" fn dahl_partition__summary__expected_loss(
     n_samples: c_int,
     n_items: c_int,
-    partition_ptr: *const c_int,
+    partition_ptr: *mut c_int,
     psm_ptr: *mut c_double,
     loss: c_int,
     results_ptr: *mut c_double,

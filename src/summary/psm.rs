@@ -26,10 +26,10 @@ mod tests {
     #[test]
     fn test_psm() {
         let mut partitions = PartitionsHolder::new(4);
-        partitions.push(Partition::from("AABB".as_bytes()));
-        partitions.push(Partition::from("AAAB".as_bytes()));
-        partitions.push(Partition::from("ABBB".as_bytes()));
-        partitions.push(Partition::from("AAAB".as_bytes()));
+        partitions.push(&Partition::from("AABB".as_bytes()));
+        partitions.push(&Partition::from("AAAB".as_bytes()));
+        partitions.push(&Partition::from("ABBB".as_bytes()));
+        partitions.push(&Partition::from("AAAB".as_bytes()));
         let partitions_view = partitions.view();
         let psm1 = psm(&partitions_view, true);
         assert_eq!(format!("{:?}", psm1.data), "[1.0, 0.75, 0.5, 0.0, 0.75, 1.0, 0.75, 0.25, 0.5, 0.75, 1.0, 0.5, 0.0, 0.25, 0.5, 1.0]");
@@ -123,7 +123,7 @@ pub unsafe extern "C" fn dahl_partition__summary__psm(
     n_samples: c_int,
     n_items: c_int,
     parallel: c_int,
-    partitions_ptr: *const c_int,
+    partitions_ptr: *mut c_int,
     psm_ptr: *mut c_double,
 ) -> () {
     let ns = n_samples as usize;

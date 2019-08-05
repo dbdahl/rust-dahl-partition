@@ -53,6 +53,37 @@ impl Partition {
         }
     }
 
+    pub fn in_one_subset(n_items: usize) -> Partition {
+        let mut subset = Subset::new();
+        for i in 0..n_items {
+            subset.add(i);
+        }
+        let labels = vec![Some(0); n_items];
+        Partition {
+            n_items,
+            n_allocated_items: n_items,
+            subsets: vec![subset],
+            labels,
+        }
+    }
+
+    pub fn in_singleton_subsets(n_items: usize) -> Partition {
+        let mut subsets = Vec::with_capacity(n_items);
+        let mut labels = Vec::with_capacity(n_items);
+        for i in 0..n_items {
+            let mut subset = Subset::new();
+            subset.add(i);
+            subsets.push(subset);
+            labels.push(Some(i));
+        }
+        Partition {
+            n_items,
+            n_allocated_items: n_items,
+            subsets,
+            labels,
+        }
+    }
+
     /// Instantiates a partition from a slice of subset labels.
     /// Items `i` and `j` are in the subset if and only if their labels are equal.
     ///
@@ -813,7 +844,7 @@ impl PartitionsHolder {
         }
     }
 
-    pub fn push(&mut self, partition: Partition) {
+    pub fn push(&mut self, partition: &Partition) {
         assert_eq!(partition.n_items(), self.n_items);
         for i in partition.labels_with_missing() {
             self.data.push(u16::try_from(i.unwrap()).unwrap())
@@ -835,7 +866,7 @@ pub struct PartitionsHolderView<'a, T>
 where
     T: PartialEq,
 {
-    data: &'a [T],
+    data: &'a mut [T],
     n_samples: usize,
     n_items: usize,
     by_row: bool,
@@ -855,12 +886,25 @@ where
     }
 }
 
+impl<T> std::ops::IndexMut<(usize, usize)> for PartitionsHolderView<'_, T>
+where
+    T: PartialEq,
+{
+    fn index_mut(&mut self, (i, j): (usize, usize)) -> &mut Self::Output {
+        if self.by_row {
+            &mut self.data[self.n_samples * j + i]
+        } else {
+            &mut self.data[self.n_items * i + j]
+        }
+    }
+}
+
 impl<'a, T> PartitionsHolderView<'a, T>
 where
     T: PartialEq,
 {
     pub fn from_slice(
-        data: &'a [T],
+        data: &'a mut [T],
         n_samples: usize,
         n_items: usize,
         by_row: bool,
@@ -897,12 +941,12 @@ where
 
 impl<'a> PartitionsHolderView<'a, c_int> {
     pub unsafe fn from_ptr(
-        data: *const c_int,
+        data: *mut c_int,
         n_samples: usize,
         n_items: usize,
         by_row: bool,
     ) -> PartitionsHolderView<'a, c_int> {
-        let data = slice::from_raw_parts(data, n_samples * n_items);
+        let data = slice::from_raw_parts_mut(data, n_samples * n_items);
         PartitionsHolderView {
             data,
             n_samples,

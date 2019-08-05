@@ -43,7 +43,7 @@ mod tests {
         let mass = 2.0;
         let mut samples = PartitionsHolder::with_capacity(n_samples, n_items);
         for _ in 0..n_samples {
-            samples.push(sample(n_items, mass));
+            samples.push(&sample(n_items, mass));
         }
         let mut psm = psm(&samples.view(), true);
         let truth = 1.0 / (1.0 + mass);
