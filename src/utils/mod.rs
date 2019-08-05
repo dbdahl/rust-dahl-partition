@@ -5,9 +5,30 @@ use num_bigint::BigUint;
 use num_traits::cast::ToPrimitive;
 use num_traits::{One, Zero};
 use std::convert::TryFrom;
+use std::f64;
 use std::os::raw::c_int;
 
+/// Computes the natural logarithm of the Bell number.
+///
 pub fn lbell(n: usize) -> f64 {
+    let value = bell_engine(n);
+    let n_bits = value.bits();
+    let threshold = 1022usize;
+    let log2 = if n_bits > threshold {
+        let n_shifted_bits = value.bits() - threshold;
+        let shifted_value = value >> n_shifted_bits;
+        if shifted_value.bits() > threshold {
+            return f64::INFINITY;
+        }
+        let y: f64 = shifted_value.to_f64().unwrap();
+        (n_shifted_bits as f64) + y.log2()
+    } else {
+        value.to_f64().unwrap().log2()
+    };
+    log2 / f64::consts::LOG2_E
+}
+
+fn bell_engine(n: usize) -> BigUint {
     let mut r1: Vec<BigUint> = vec![Zero::zero(); n];
     let mut r2: Vec<BigUint> = vec![Zero::zero(); n];
     r1[0] = One::one();
@@ -20,21 +41,18 @@ pub fn lbell(n: usize) -> f64 {
         r1 = r2;
         r2 = tmp;
     }
-    let value = &r1[n - 1];
-    let blex = i64::try_from(value.bits()).unwrap() - 1022;
-    if blex > 0 {
-        let y: f64 = (value >> (blex as usize)).to_f64().unwrap();
-        let w: f64 = 2.0;
-        y + (blex as f64) * w.ln()
-    } else {
-        value.to_f64().unwrap().ln()
-    }
+    r1[n - 1].clone()
 }
 
 #[no_mangle]
 pub extern "C" fn dahl_partition__utils__lbell(n: c_int) -> f64 {
-    let n = usize::try_from(n).unwrap();
-    lbell(n)
+    if n < 0 {
+        return 0.0;
+    }
+    match usize::try_from(n) {
+        Ok(n) => lbell(n),
+        Err(_) => f64::INFINITY,
+    }
 }
 
 #[cfg(test)]
@@ -43,7 +61,8 @@ mod tests {
 
     #[test]
     fn test_lbell() {
-        assert!((lbell(5).exp() - 52.0).abs() < 1.0)
+        assert!((lbell(220) - 714.4033).abs() < 0.001);
+        assert!((lbell(5).exp() - 52.0).abs() < 0.001);
     }
 
 }
