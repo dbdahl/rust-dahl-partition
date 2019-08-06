@@ -33,7 +33,7 @@ impl Partition {
     /// # Examples
     ///
     /// ```
-    /// use dahl_partition::*;
+    /// use dahl_partition::structure::*;
     /// let partition = Partition::new(10);
     /// assert_eq!(partition.n_items(), 10);
     /// assert_eq!(partition.n_subsets(), 0);
@@ -85,7 +85,7 @@ impl Partition {
     /// # Examples
     ///
     /// ```
-    /// use dahl_partition::*;
+    /// use dahl_partition::structure::*;
     /// let labels = vec!('a', 'a', 'a', 't', 't', 'a', 'a', 'w', 'a', 'w');
     /// let partition1 = Partition::from(&labels[..]);
     /// let partition2 = Partition::from(&[2,2,2,5,5,2,2,7,2,7]);
@@ -134,7 +134,7 @@ impl Partition {
     /// # Examples
     ///
     /// ```
-    /// use dahl_partition::*;
+    /// use dahl_partition::structure::*;
     /// let partition = Partition::from("AAABBAACAC".as_bytes());
     /// assert_eq!(partition.n_items(), 10);
     /// ```
@@ -147,7 +147,7 @@ impl Partition {
     /// # Examples
     ///
     /// ```
-    /// use dahl_partition::*;
+    /// use dahl_partition::structure::*;
     /// let mut partition = Partition::from("AAABBAACAC".as_bytes());
     /// assert_eq!(partition.n_subsets(), 3);
     /// partition.remove(7);
@@ -183,7 +183,7 @@ impl Partition {
     /// # Examples
     ///
     /// ```
-    /// use dahl_partition::*;
+    /// use dahl_partition::structure::*;
     /// let mut partition = Partition::from("AAABBAACAC".as_bytes());
     /// assert_eq!(partition.n_subsets(), 3);
     /// assert!(partition.subsets_are_nonempty());
@@ -200,7 +200,7 @@ impl Partition {
     /// # Examples
     ///
     /// ```
-    /// use dahl_partition::*;
+    /// use dahl_partition::structure::*;
     /// let mut partition = Partition::new(3);
     /// partition.add(1);
     /// assert_eq!(partition.to_string(), "_ 0 _");
@@ -223,7 +223,7 @@ impl Partition {
     /// # Examples
     ///
     /// ```
-    /// use dahl_partition::*;
+    /// use dahl_partition::structure::*;
     /// let mut partition = Partition::new(3);
     /// partition.add(1);
     /// assert_eq!(partition.to_string(), "_ 0 _");
@@ -244,7 +244,7 @@ impl Partition {
     /// # Examples
     ///
     /// ```
-    /// use dahl_partition::*;
+    /// use dahl_partition::structure::*;
     /// let mut partition = Partition::from("AAABBAACAC".as_bytes());
     /// partition.remove(1);
     /// partition.remove(4);
@@ -265,7 +265,7 @@ impl Partition {
     /// # Examples
     ///
     /// ```
-    /// use dahl_partition::*;
+    /// use dahl_partition::structure::*;
     /// let mut partition = Partition::from("AAABBAACAC".as_bytes());
     /// partition.remove_with_index(1,0);
     /// partition.remove_with_index(4,1);
@@ -314,7 +314,7 @@ impl Partition {
     /// # Examples
     ///
     /// ```
-    /// use dahl_partition::*;
+    /// use dahl_partition::structure::*;
     /// let mut partition = Partition::new(3);
     /// partition.add(1);
     /// assert_eq!(partition.to_string(), "_ 0 _");
