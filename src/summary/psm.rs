@@ -1,5 +1,4 @@
 extern crate num_cpus;
-extern crate num_traits;
 
 use crate::structure::*;
 use std::slice;

@@ -1,5 +1,3 @@
-extern crate num_traits;
-
 use crate::structure::*;
 use crate::summary::psm::PairwiseSimilarityMatrixView;
 

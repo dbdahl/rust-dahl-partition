@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 
-extern crate num_traits;
-
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
