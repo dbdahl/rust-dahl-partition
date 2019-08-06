@@ -10,7 +10,7 @@ pub fn binder<A>(
     A: PartialEq,
 {
     let ni = psm.n_items();
-    for k in 0..partitions.n_samples {
+    for k in 0..partitions.n_partitions {
         let mut sum = 0.0;
         for j in 0..ni {
             for i in 0..j {
@@ -47,7 +47,7 @@ pub fn vilb<A>(
         }
         s1
     };
-    for k in 0..partitions.n_samples {
+    for k in 0..partitions.n_partitions {
         let mut sum = sum2;
         for i in 0..ni {
             let mut s1 = 0u32;
@@ -67,18 +67,18 @@ pub fn vilb<A>(
 
 #[no_mangle]
 pub unsafe extern "C" fn dahl_partition__summary__expected_loss(
-    n_samples: c_int,
+    n_partitions: c_int,
     n_items: c_int,
     partition_ptr: *mut c_int,
     psm_ptr: *mut c_double,
     loss: c_int,
     results_ptr: *mut c_double,
 ) {
-    let ns = n_samples as usize;
+    let np = n_partitions as usize;
     let ni = n_items as usize;
-    let partitions = PartitionsHolderView::from_ptr(partition_ptr, ns, ni, true);
+    let partitions = PartitionsHolderView::from_ptr(partition_ptr, np, ni, true);
     let psm = PairwiseSimilarityMatrixView::from_ptr(psm_ptr, ni);
-    let results = slice::from_raw_parts_mut(results_ptr, ns);
+    let results = slice::from_raw_parts_mut(results_ptr, np);
     match loss {
         0 => binder(&partitions, &psm, results),
         1 => vilb(&partitions, &psm, results),

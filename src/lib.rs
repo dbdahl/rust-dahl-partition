@@ -820,7 +820,7 @@ impl<'a> PairwiseSimilarityMatrixView<'a> {
 ///
 pub struct PartitionsHolder {
     data: Vec<u16>,
-    n_samples: usize,
+    n_partitions: usize,
     n_items: usize,
     by_row: bool,
 }
@@ -829,7 +829,7 @@ impl PartitionsHolder {
     pub fn new(n_items: usize) -> PartitionsHolder {
         PartitionsHolder {
             data: Vec::new(),
-            n_samples: 0,
+            n_partitions: 0,
             n_items,
             by_row: false,
         }
@@ -838,7 +838,7 @@ impl PartitionsHolder {
     pub fn with_capacity(capacity: usize, n_items: usize) -> PartitionsHolder {
         PartitionsHolder {
             data: Vec::with_capacity(capacity * n_items),
-            n_samples: 0,
+            n_partitions: 0,
             n_items,
             by_row: false,
         }
@@ -849,13 +849,13 @@ impl PartitionsHolder {
         for i in partition.labels_with_missing() {
             self.data.push(u16::try_from(i.unwrap()).unwrap())
         }
-        self.n_samples += 1
+        self.n_partitions += 1
     }
 
     pub fn view(&mut self) -> PartitionsHolderView<u16> {
         PartitionsHolderView::from_slice(
             &mut self.data[..],
-            self.n_samples,
+            self.n_partitions,
             self.n_items,
             self.by_row,
         )
@@ -867,7 +867,7 @@ where
     T: PartialEq,
 {
     data: &'a mut [T],
-    n_samples: usize,
+    n_partitions: usize,
     n_items: usize,
     by_row: bool,
 }
@@ -879,7 +879,7 @@ where
     type Output = T;
     fn index(&self, (i, j): (usize, usize)) -> &Self::Output {
         if self.by_row {
-            &self.data[self.n_samples * j + i]
+            &self.data[self.n_partitions * j + i]
         } else {
             &self.data[self.n_items * i + j]
         }
@@ -892,7 +892,7 @@ where
 {
     fn index_mut(&mut self, (i, j): (usize, usize)) -> &mut Self::Output {
         if self.by_row {
-            &mut self.data[self.n_samples * j + i]
+            &mut self.data[self.n_partitions * j + i]
         } else {
             &mut self.data[self.n_items * i + j]
         }
@@ -905,21 +905,21 @@ where
 {
     pub fn from_slice(
         data: &'a mut [T],
-        n_samples: usize,
+        n_partitions: usize,
         n_items: usize,
         by_row: bool,
     ) -> PartitionsHolderView<'a, T> {
-        assert_eq!(data.len(), n_samples * n_items);
+        assert_eq!(data.len(), n_partitions * n_items);
         PartitionsHolderView {
             data,
-            n_samples,
+            n_partitions,
             n_items,
             by_row,
         }
     }
 
-    pub fn n_samples(&self) -> usize {
-        self.n_samples
+    pub fn n_partitions(&self) -> usize {
+        self.n_partitions
     }
 
     pub fn n_items(&self) -> usize {
@@ -932,7 +932,7 @@ where
 
     pub unsafe fn get_unchecked(&self, (i, j): (usize, usize)) -> &T {
         if self.by_row {
-            self.data.get_unchecked(self.n_samples * j + i)
+            self.data.get_unchecked(self.n_partitions * j + i)
         } else {
             self.data.get_unchecked(self.n_items * i + j)
         }
@@ -942,14 +942,14 @@ where
 impl<'a> PartitionsHolderView<'a, c_int> {
     pub unsafe fn from_ptr(
         data: *mut c_int,
-        n_samples: usize,
+        n_partitions: usize,
         n_items: usize,
         by_row: bool,
     ) -> PartitionsHolderView<'a, c_int> {
-        let data = slice::from_raw_parts_mut(data, n_samples * n_items);
+        let data = slice::from_raw_parts_mut(data, n_partitions * n_items);
         PartitionsHolderView {
             data,
-            n_samples,
+            n_partitions,
             n_items,
             by_row,
         }
