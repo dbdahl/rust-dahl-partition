@@ -1,8 +1,78 @@
 extern crate num_cpus;
 
-use crate::*;
+use crate::structure::*;
+
 use std::os::raw::{c_double, c_int};
 use std::slice;
+
+/// A data structure representing a pairwise similarity matrix.
+///
+pub struct PairwiseSimilarityMatrix {
+    data: Vec<f64>,
+    n_items: usize,
+}
+
+impl PairwiseSimilarityMatrix {
+    pub fn new(n_items: usize) -> PairwiseSimilarityMatrix {
+        PairwiseSimilarityMatrix {
+            data: vec![1.0; n_items * n_items],
+            n_items,
+        }
+    }
+
+    pub fn view(&mut self) -> PairwiseSimilarityMatrixView {
+        PairwiseSimilarityMatrixView::from_slice(&mut self.data[..], self.n_items)
+    }
+}
+
+pub struct PairwiseSimilarityMatrixView<'a> {
+    data: &'a mut [f64],
+    n_items: usize,
+}
+
+impl std::ops::Index<(usize, usize)> for PairwiseSimilarityMatrixView<'_> {
+    type Output = f64;
+    fn index(&self, (i, j): (usize, usize)) -> &Self::Output {
+        &self.data[self.n_items * j + i]
+    }
+}
+
+impl std::ops::IndexMut<(usize, usize)> for PairwiseSimilarityMatrixView<'_> {
+    fn index_mut(&mut self, (i, j): (usize, usize)) -> &mut Self::Output {
+        &mut self.data[self.n_items * j + i]
+    }
+}
+
+impl<'a> PairwiseSimilarityMatrixView<'a> {
+    pub fn from_slice(data: &'a mut [f64], n_items: usize) -> PairwiseSimilarityMatrixView<'a> {
+        assert_eq!(data.len(), n_items * n_items);
+        PairwiseSimilarityMatrixView { data, n_items }
+    }
+
+    pub unsafe fn from_ptr(
+        data: *mut c_double,
+        n_items: usize,
+    ) -> PairwiseSimilarityMatrixView<'a> {
+        let data = slice::from_raw_parts_mut(data, n_items * n_items);
+        PairwiseSimilarityMatrixView { data, n_items }
+    }
+
+    pub fn n_items(&self) -> usize {
+        self.n_items
+    }
+
+    pub unsafe fn get_unchecked(&self, (i, j): (usize, usize)) -> &f64 {
+        self.data.get_unchecked(self.n_items * j + i)
+    }
+
+    pub unsafe fn get_unchecked_mut(&mut self, (i, j): (usize, usize)) -> &mut f64 {
+        self.data.get_unchecked_mut(self.n_items * j + i)
+    }
+
+    pub fn data(&self) -> &[f64] {
+        self.data
+    }
+}
 
 pub fn psm<A>(partitions: &PartitionsHolderView<A>, parallel: bool) -> PairwiseSimilarityMatrix
 where
@@ -128,7 +198,7 @@ pub unsafe extern "C" fn dahl_partition__summary__psm(
 ) -> () {
     let np = n_partitions as usize;
     let ni = n_items as usize;
-    let partitions = PartitionsHolderView::from_ptr(partitions_ptr, np, ni, true);
+    let partitions = crate::structure::PartitionsHolderView::from_ptr(partitions_ptr, np, ni, true);
     let mut psm = PairwiseSimilarityMatrixView::from_ptr(psm_ptr, ni);
     engine(np, ni, parallel != 0, &partitions, &mut psm);
 }

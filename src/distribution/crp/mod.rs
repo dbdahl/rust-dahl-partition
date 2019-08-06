@@ -1,6 +1,8 @@
 extern crate rand;
 
-use crate::Partition;
+use crate::structure::*;
+use crate::summary::psm;
+
 use rand::distributions::{Distribution, WeightedIndex};
 
 pub fn sample(n_items: usize, mass: f64) -> Partition {
@@ -33,8 +35,6 @@ pub fn sample(n_items: usize, mass: f64) -> Partition {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::summary::psm;
-    use crate::PartitionsHolder;
 
     #[test]
     fn test_sample() {
@@ -48,7 +48,7 @@ mod tests {
         let mut psm = psm(&samples.view(), true);
         let truth = 1.0 / (1.0 + mass);
         let margin_of_error = 3.58 * (truth * (1.0 - truth) / n_partitions as f64).sqrt();
-        assert!(psm.view().data.iter().all(|prob| {
+        assert!(psm.view().data().iter().all(|prob| {
             *prob == 1.0 || (truth - margin_of_error < *prob && *prob < truth + margin_of_error)
         }));
     }

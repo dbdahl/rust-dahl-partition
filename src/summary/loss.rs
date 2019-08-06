@@ -1,4 +1,6 @@
-use crate::*;
+use crate::structure::*;
+use crate::summary::psm::PairwiseSimilarityMatrixView;
+
 use std::os::raw::{c_double, c_int};
 use std::slice;
 
@@ -10,7 +12,7 @@ pub fn binder<A>(
     A: PartialEq,
 {
     let ni = psm.n_items();
-    for k in 0..partitions.n_partitions {
+    for k in 0..partitions.n_partitions() {
         let mut sum = 0.0;
         for j in 0..ni {
             for i in 0..j {
@@ -47,7 +49,7 @@ pub fn vilb<A>(
         }
         s1
     };
-    for k in 0..partitions.n_partitions {
+    for k in 0..partitions.n_partitions() {
         let mut sum = sum2;
         for i in 0..ni {
             let mut s1 = 0u32;
@@ -61,7 +63,7 @@ pub fn vilb<A>(
             }
             sum += f64::from(s1).log2() - 2.0 * s2.log2();
         }
-        unsafe { *results.get_unchecked_mut(k) = sum / (psm.n_items as f64) };
+        unsafe { *results.get_unchecked_mut(k) = sum / (psm.n_items() as f64) };
     }
 }
 
