@@ -48,7 +48,7 @@ impl Partition {
         }
     }
 
-    pub fn in_one_subset(n_items: usize) -> Partition {
+    pub fn one_subset(n_items: usize) -> Partition {
         let mut subset = Subset::new();
         for i in 0..n_items {
             subset.add(i);
@@ -62,7 +62,7 @@ impl Partition {
         }
     }
 
-    pub fn in_singleton_subsets(n_items: usize) -> Partition {
+    pub fn singleton_subsets(n_items: usize) -> Partition {
         let mut subsets = Vec::with_capacity(n_items);
         let mut labels = Vec::with_capacity(n_items);
         for i in 0..n_items {
@@ -774,10 +774,32 @@ impl PartitionsHolder {
         }
     }
 
+    pub fn allocated(n_partitions: usize, n_items: usize, by_row: bool) -> PartitionsHolder {
+        PartitionsHolder {
+            data: vec![0; n_partitions * n_items],
+            n_partitions,
+            n_items,
+            by_row,
+        }
+    }
+
+    pub fn n_partitions(&self) -> usize {
+        self.n_partitions
+    }
+
+    pub fn n_items(&self) -> usize {
+        self.n_items
+    }
+
+    pub fn by_row(&self) -> bool {
+        self.by_row
+    }
+
     pub fn push(&mut self, partition: &Partition) {
-        assert_eq!(partition.n_items(), self.n_items);
-        for i in partition.labels_with_missing() {
-            self.data.push(i32::try_from(i.unwrap()).unwrap())
+        assert!(!self.by_row, "Pushing requires that by_row = false.");
+        assert_eq!(partition.n_items, self.n_items);
+        for j in partition.labels_with_missing() {
+            self.data.push(i32::try_from(j.unwrap()).unwrap())
         }
         self.n_partitions += 1
     }
@@ -838,42 +860,6 @@ impl<'a> PartitionsHolderView<'a> {
         }
     }
 
-    pub fn n_partitions(&self) -> usize {
-        self.n_partitions
-    }
-
-    pub fn n_items(&self) -> usize {
-        self.n_items
-    }
-
-    pub fn by_row(&self) -> bool {
-        self.by_row
-    }
-
-    pub unsafe fn get_unchecked(&self, (i, j): (usize, usize)) -> &i32 {
-        if self.by_row {
-            self.data.get_unchecked(self.n_partitions * j + i)
-        } else {
-            self.data.get_unchecked(self.n_items * i + j)
-        }
-    }
-
-    pub fn push(&mut self, partition: &Partition) {
-        assert_eq!(partition.n_items(), self.n_items);
-        for i in partition.labels_with_missing() {
-            let i = i.unwrap();
-            unsafe {
-                *self
-                    .data
-                    .get_unchecked_mut(self.n_partitions * self.index + i) =
-                    i32::try_from(i).unwrap();
-            }
-        }
-        self.n_partitions += 1
-    }
-}
-
-impl<'a> PartitionsHolderView<'a> {
     pub unsafe fn from_ptr(
         data: *mut i32,
         n_partitions: usize,
@@ -889,20 +875,137 @@ impl<'a> PartitionsHolderView<'a> {
             index: 0,
         }
     }
+    pub fn n_partitions(&self) -> usize {
+        self.n_partitions
+    }
 
-    /*
+    pub fn n_items(&self) -> usize {
+        self.n_items
+    }
+
+    pub fn by_row(&self) -> bool {
+        self.by_row
+    }
+
+    pub fn data(&self) -> &[i32] {
+        self.data
+    }
+
+    pub unsafe fn get_unchecked(&self, (i, j): (usize, usize)) -> &i32 {
+        if self.by_row {
+            self.data.get_unchecked(self.n_partitions * j + i)
+        } else {
+            self.data.get_unchecked(self.n_items * i + j)
+        }
+    }
+
+    pub unsafe fn get_unchecked_mut(&mut self, (i, j): (usize, usize)) -> &mut i32 {
+        if self.by_row {
+            self.data.get_unchecked_mut(self.n_partitions * j + i)
+        } else {
+            self.data.get_unchecked_mut(self.n_items * i + j)
+        }
+    }
+
+    pub fn get(&self, i: usize) -> Partition {
+        if self.by_row {
+            let mut labels = Vec::with_capacity(self.n_items);
+            for j in 0..self.n_items {
+                labels.push(self.data[self.n_partitions * j + i]);
+            }
+            Partition::from(&labels[..])
+        } else {
+            Partition::from(&self.data[(i * self.n_items)..((i + 1) * self.n_items)])
+        }
+    }
+
     pub fn push(&mut self, partition: &Partition) {
-        assert_eq!(partition.n_items(), self.n_items);
-        for i in partition.labels_with_missing() {
-            let i = i.unwrap();
+        assert!(
+            self.index < self.n_partitions,
+            format!(
+                "The holder has capacity {} so cannot push with index {}.",
+                self.n_partitions, self.index
+            )
+        );
+        assert_eq!(
+            partition.n_items(),
+            self.n_items,
+            "Inconsistent number of items."
+        );
+        for (j, v) in partition.labels_with_missing().iter().enumerate() {
+            let v = i32::try_from(v.unwrap()).unwrap();
+            let o = if self.by_row {
+                self.n_partitions * j + self.index
+            } else {
+                self.n_items * self.index + j
+            };
             unsafe {
-                *self
-                    .data
-                    .get_unchecked_mut(self.n_partitions * self.index + i) =
-                    c_int::try_from(i).unwrap();
+                *self.data.get_unchecked_mut(o) = v;
             }
         }
-        self.n_partitions += 1
+        self.index += 1;
     }
-    */
+}
+
+impl<'a> fmt::Display for PartitionsHolderView<'a> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        for i in 0..self.n_partitions {
+            let x = self.get(i).to_string();
+            fmt.write_str(&x[..])?;
+            fmt.write_str("\n")?;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests_partitions_holder {
+    use super::*;
+
+    #[test]
+    fn test_partition_holder() {
+        let mut phf = PartitionsHolder::new(4);
+        assert!(!phf.by_row());
+        assert_eq!(phf.n_partitions(), 0);
+        phf.push(&Partition::from("AABC".as_bytes()));
+        phf.push(&Partition::from("ABCD".as_bytes()));
+        phf.push(&Partition::from("AABA".as_bytes()));
+        assert_eq!(phf.n_partitions(), 3);
+        let mut phfv = phf.view();
+        assert_eq!(phfv.data(), &[0, 0, 1, 2, 0, 1, 2, 3, 0, 0, 1, 0]);
+
+        let mut phf2 = PartitionsHolder::allocated(3, 4, false);
+        let mut phfv2 = phf2.view();
+        phfv2.push(&Partition::from("AABC".as_bytes()));
+        phfv2.push(&Partition::from("ABCD".as_bytes()));
+        phfv2.push(&Partition::from("AABA".as_bytes()));
+        assert_eq!(phfv2.n_partitions(), 3);
+        assert_eq!(phfv.data, phfv2.data);
+        unsafe {
+            *phfv2.get_unchecked_mut((0, 1)) = 9;
+        }
+        phfv2[(1, 3)] = 9;
+        assert_eq!(phfv2.data(), &[0, 9, 1, 2, 0, 1, 2, 9, 0, 0, 1, 0]);
+        assert_eq!(phfv2.get(0), Partition::from("ABCD".as_bytes()));
+        assert_eq!(phfv2.get(2), Partition::from("AABA".as_bytes()));
+
+        let mut pht = PartitionsHolder::allocated(3, 4, true);
+        assert!(pht.by_row());
+        assert_eq!(pht.n_partitions(), 3);
+        let mut phtv = pht.view();
+        assert_eq!(phtv.data(), &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        phtv.push(&Partition::from("AABC".as_bytes()));
+        phtv.push(&Partition::from("ABCD".as_bytes()));
+        phtv.push(&Partition::from("AABA".as_bytes()));
+        assert_eq!(phtv.n_partitions(), 3);
+        assert_eq!(phtv.data(), &[0, 0, 0, 0, 1, 0, 1, 2, 1, 2, 3, 0]);
+        unsafe {
+            *phtv.get_unchecked_mut((0, 1)) = 9;
+        }
+        phtv[(1, 3)] = 9;
+        assert_eq!(phtv.data(), &[0, 0, 0, 9, 1, 0, 1, 2, 1, 2, 9, 0]);
+        assert_eq!(phtv.get(0), Partition::from("ABCD".as_bytes()));
+        assert_eq!(phtv.get(2), Partition::from("AABA".as_bytes()));
+    }
+
 }
