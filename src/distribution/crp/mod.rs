@@ -1,9 +1,10 @@
 extern crate rand;
 
 use crate::structure::*;
-use crate::summary::psm;
 
 use rand::distributions::{Distribution, WeightedIndex};
+use std::convert::TryFrom;
+use std::slice;
 
 pub fn sample(n_items: usize, mass: f64) -> Partition {
     assert!(mass > 0.0, "Mass must be greater than 0.0.");
@@ -45,7 +46,7 @@ mod tests {
         for _ in 0..n_partitions {
             samples.push(&sample(n_items, mass));
         }
-        let mut psm = psm(&samples.view(), true);
+        let mut psm = crate::summary::psm(&samples.view(), true);
         let truth = 1.0 / (1.0 + mass);
         let margin_of_error = 3.58 * (truth * (1.0 - truth) / n_partitions as f64).sqrt();
         assert!(psm.view().data().iter().all(|prob| {
@@ -55,25 +56,21 @@ mod tests {
 
 }
 
-use std::convert::TryFrom;
-use std::os::raw::{c_double, c_int};
-use std::slice;
-
 #[no_mangle]
 pub unsafe extern "C" fn dahl_partition__distribution__crp__sample(
-    n_partitions: c_int,
-    n_items: c_int,
-    mass: c_double,
-    ptr: *mut c_int,
+    n_partitions: i32,
+    n_items: i32,
+    mass: f64,
+    ptr: *mut i32,
 ) -> () {
     let np = n_partitions as usize;
     let ni = n_items as usize;
-    let array: &mut [c_int] = slice::from_raw_parts_mut(ptr, np * ni);
+    let array: &mut [i32] = slice::from_raw_parts_mut(ptr, np * ni);
     for i in 0..np {
         let p = sample(ni, mass);
         let labels = p.labels_with_missing();
         for j in 0..ni {
-            array[np * j + i] = c_int::try_from(labels[j].unwrap()).unwrap();
+            array[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
         }
     }
 }

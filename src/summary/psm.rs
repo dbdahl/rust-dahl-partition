@@ -1,8 +1,7 @@
 extern crate num_cpus;
+extern crate num_traits;
 
 use crate::structure::*;
-
-use std::os::raw::{c_double, c_int};
 use std::slice;
 
 /// A data structure representing a pairwise similarity matrix.
@@ -49,10 +48,7 @@ impl<'a> PairwiseSimilarityMatrixView<'a> {
         PairwiseSimilarityMatrixView { data, n_items }
     }
 
-    pub unsafe fn from_ptr(
-        data: *mut c_double,
-        n_items: usize,
-    ) -> PairwiseSimilarityMatrixView<'a> {
+    pub unsafe fn from_ptr(data: *mut f64, n_items: usize) -> PairwiseSimilarityMatrixView<'a> {
         let data = slice::from_raw_parts_mut(data, n_items * n_items);
         PairwiseSimilarityMatrixView { data, n_items }
     }
@@ -74,10 +70,7 @@ impl<'a> PairwiseSimilarityMatrixView<'a> {
     }
 }
 
-pub fn psm<A>(partitions: &PartitionsHolderView<A>, parallel: bool) -> PairwiseSimilarityMatrix
-where
-    A: PartialEq + Sync + Send,
-{
+pub fn psm(partitions: &PartitionsHolderView, parallel: bool) -> PairwiseSimilarityMatrix {
     let mut psm = PairwiseSimilarityMatrix::new(partitions.n_items());
     engine(
         partitions.n_partitions(),
@@ -109,16 +102,13 @@ mod tests {
 
 }
 
-fn engine<A>(
+fn engine(
     n_partitions: usize,
     n_items: usize,
     parallel: bool,
-    partitions: &PartitionsHolderView<A>,
+    partitions: &PartitionsHolderView,
     psm: &mut PairwiseSimilarityMatrixView,
-) -> ()
-where
-    A: PartialEq + Sync + Send,
-{
+) -> () {
     if !parallel {
         engine2(n_partitions, n_items, None, partitions, psm);
     } else {
@@ -154,16 +144,13 @@ where
     }
 }
 
-fn engine2<A>(
+fn engine2(
     n_partitions: usize,
     n_items: usize,
     range: Option<std::ops::Range<usize>>,
-    partitions: &PartitionsHolderView<A>,
+    partitions: &PartitionsHolderView,
     psm: &mut PairwiseSimilarityMatrixView,
-) -> ()
-where
-    A: PartialEq,
-{
+) -> () {
     let npf = n_partitions as f64;
     let indices = range.unwrap_or(0..n_items);
     for j in indices {
@@ -190,11 +177,11 @@ where
 
 #[no_mangle]
 pub unsafe extern "C" fn dahl_partition__summary__psm(
-    n_partitions: c_int,
-    n_items: c_int,
-    parallel: c_int,
-    partitions_ptr: *mut c_int,
-    psm_ptr: *mut c_double,
+    n_partitions: i32,
+    n_items: i32,
+    parallel: i32,
+    partitions_ptr: *mut i32,
+    psm_ptr: *mut f64,
 ) -> () {
     let np = n_partitions as usize;
     let ni = n_items as usize;

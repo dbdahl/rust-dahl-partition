@@ -1,16 +1,15 @@
+extern crate num_traits;
+
 use crate::structure::*;
 use crate::summary::psm::PairwiseSimilarityMatrixView;
 
-use std::os::raw::{c_double, c_int};
 use std::slice;
 
-pub fn binder<A>(
-    partitions: &PartitionsHolderView<A>,
+pub fn binder(
+    partitions: &PartitionsHolderView,
     psm: &PairwiseSimilarityMatrixView,
     results: &mut [f64],
-) where
-    A: PartialEq,
-{
+) {
     let ni = psm.n_items();
     for k in 0..partitions.n_partitions() {
         let mut sum = 0.0;
@@ -30,13 +29,11 @@ pub fn binder<A>(
     }
 }
 
-pub fn vilb<A>(
-    partitions: &PartitionsHolderView<A>,
+pub fn vilb(
+    partitions: &PartitionsHolderView,
     psm: &PairwiseSimilarityMatrixView,
     results: &mut [f64],
-) where
-    A: PartialEq,
-{
+) {
     let ni = psm.n_items();
     let sum2 = {
         let mut s1 = 0.0;
@@ -69,12 +66,12 @@ pub fn vilb<A>(
 
 #[no_mangle]
 pub unsafe extern "C" fn dahl_partition__summary__expected_loss(
-    n_partitions: c_int,
-    n_items: c_int,
-    partition_ptr: *mut c_int,
-    psm_ptr: *mut c_double,
-    loss: c_int,
-    results_ptr: *mut c_double,
+    n_partitions: i32,
+    n_items: i32,
+    partition_ptr: *mut i32,
+    psm_ptr: *mut f64,
+    loss: i32,
+    results_ptr: *mut f64,
 ) {
     let np = n_partitions as usize;
     let ni = n_items as usize;

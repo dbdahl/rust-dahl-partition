@@ -1,12 +1,13 @@
 #![allow(dead_code)]
 
+extern crate num_traits;
+
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::convert::TryFrom;
 use std::fmt;
 use std::hash::Hash;
-use std::os::raw::c_int;
 use std::slice;
 
 /// A partition of `n_items` is a set of subsets such that the subsets are mutually exclusive,
@@ -750,7 +751,7 @@ mod tests_subset {
 /// A data structure holding partitions
 ///
 pub struct PartitionsHolder {
-    data: Vec<u16>,
+    data: Vec<i32>,
     n_partitions: usize,
     n_items: usize,
     by_row: bool,
@@ -778,12 +779,12 @@ impl PartitionsHolder {
     pub fn push(&mut self, partition: &Partition) {
         assert_eq!(partition.n_items(), self.n_items);
         for i in partition.labels_with_missing() {
-            self.data.push(u16::try_from(i.unwrap()).unwrap())
+            self.data.push(i32::try_from(i.unwrap()).unwrap())
         }
         self.n_partitions += 1
     }
 
-    pub fn view(&mut self) -> PartitionsHolderView<u16> {
+    pub fn view(&mut self) -> PartitionsHolderView {
         PartitionsHolderView::from_slice(
             &mut self.data[..],
             self.n_partitions,
@@ -793,21 +794,16 @@ impl PartitionsHolder {
     }
 }
 
-pub struct PartitionsHolderView<'a, T>
-where
-    T: PartialEq,
-{
-    data: &'a mut [T],
+pub struct PartitionsHolderView<'a> {
+    data: &'a mut [i32],
     n_partitions: usize,
     n_items: usize,
     by_row: bool,
+    index: usize,
 }
 
-impl<T> std::ops::Index<(usize, usize)> for PartitionsHolderView<'_, T>
-where
-    T: PartialEq,
-{
-    type Output = T;
+impl std::ops::Index<(usize, usize)> for PartitionsHolderView<'_> {
+    type Output = i32;
     fn index(&self, (i, j): (usize, usize)) -> &Self::Output {
         if self.by_row {
             &self.data[self.n_partitions * j + i]
@@ -817,10 +813,7 @@ where
     }
 }
 
-impl<T> std::ops::IndexMut<(usize, usize)> for PartitionsHolderView<'_, T>
-where
-    T: PartialEq,
-{
+impl std::ops::IndexMut<(usize, usize)> for PartitionsHolderView<'_> {
     fn index_mut(&mut self, (i, j): (usize, usize)) -> &mut Self::Output {
         if self.by_row {
             &mut self.data[self.n_partitions * j + i]
@@ -830,22 +823,20 @@ where
     }
 }
 
-impl<'a, T> PartitionsHolderView<'a, T>
-where
-    T: PartialEq,
-{
+impl<'a> PartitionsHolderView<'a> {
     pub fn from_slice(
-        data: &'a mut [T],
+        data: &'a mut [i32],
         n_partitions: usize,
         n_items: usize,
         by_row: bool,
-    ) -> PartitionsHolderView<'a, T> {
+    ) -> PartitionsHolderView<'a> {
         assert_eq!(data.len(), n_partitions * n_items);
         PartitionsHolderView {
             data,
             n_partitions,
             n_items,
             by_row,
+            index: 0,
         }
     }
 
@@ -861,28 +852,59 @@ where
         self.by_row
     }
 
-    pub unsafe fn get_unchecked(&self, (i, j): (usize, usize)) -> &T {
+    pub unsafe fn get_unchecked(&self, (i, j): (usize, usize)) -> &i32 {
         if self.by_row {
             self.data.get_unchecked(self.n_partitions * j + i)
         } else {
             self.data.get_unchecked(self.n_items * i + j)
         }
     }
+
+    pub fn push(&mut self, partition: &Partition) {
+        assert_eq!(partition.n_items(), self.n_items);
+        for i in partition.labels_with_missing() {
+            let i = i.unwrap();
+            unsafe {
+                *self
+                    .data
+                    .get_unchecked_mut(self.n_partitions * self.index + i) =
+                    i32::try_from(i).unwrap();
+            }
+        }
+        self.n_partitions += 1
+    }
 }
 
-impl<'a> PartitionsHolderView<'a, c_int> {
+impl<'a> PartitionsHolderView<'a> {
     pub unsafe fn from_ptr(
-        data: *mut c_int,
+        data: *mut i32,
         n_partitions: usize,
         n_items: usize,
         by_row: bool,
-    ) -> PartitionsHolderView<'a, c_int> {
+    ) -> PartitionsHolderView<'a> {
         let data = slice::from_raw_parts_mut(data, n_partitions * n_items);
         PartitionsHolderView {
             data,
             n_partitions,
             n_items,
             by_row,
+            index: 0,
         }
     }
+
+    /*
+    pub fn push(&mut self, partition: &Partition) {
+        assert_eq!(partition.n_items(), self.n_items);
+        for i in partition.labels_with_missing() {
+            let i = i.unwrap();
+            unsafe {
+                *self
+                    .data
+                    .get_unchecked_mut(self.n_partitions * self.index + i) =
+                    c_int::try_from(i).unwrap();
+            }
+        }
+        self.n_partitions += 1
+    }
+    */
 }

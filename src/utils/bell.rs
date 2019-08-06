@@ -6,7 +6,6 @@ use num_traits::cast::ToPrimitive;
 use num_traits::{One, Zero};
 use std::convert::TryFrom;
 use std::f64;
-use std::os::raw::c_int;
 
 /// Computes the natural logarithm of the Bell number.
 ///
@@ -50,7 +49,7 @@ fn bell_engine(n: usize) -> BigUint {
 }
 
 #[no_mangle]
-pub extern "C" fn dahl_partition__utils__lbell(n: c_int) -> f64 {
+pub extern "C" fn dahl_partition__utils__lbell(n: i32) -> f64 {
     if n < 0 {
         return 0.0;
     }

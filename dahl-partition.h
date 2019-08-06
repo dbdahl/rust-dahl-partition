@@ -3,22 +3,22 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-void dahl_partition__distribution__crp__sample(int n_partitions,
-                                               int n_items,
+void dahl_partition__distribution__crp__sample(int32_t n_partitions,
+                                               int32_t n_items,
                                                double mass,
-                                               int *ptr);
+                                               int32_t *ptr);
 
-void dahl_partition__summary__expected_loss(int n_partitions,
-                                            int n_items,
-                                            int *partition_ptr,
+void dahl_partition__summary__expected_loss(int32_t n_partitions,
+                                            int32_t n_items,
+                                            int32_t *partition_ptr,
                                             double *psm_ptr,
-                                            int loss,
+                                            int32_t loss,
                                             double *results_ptr);
 
-void dahl_partition__summary__psm(int n_partitions,
-                                  int n_items,
-                                  int parallel,
-                                  int *partitions_ptr,
+void dahl_partition__summary__psm(int32_t n_partitions,
+                                  int32_t n_items,
+                                  int32_t parallel,
+                                  int32_t *partitions_ptr,
                                   double *psm_ptr);
 
-double dahl_partition__utils__lbell(int n);
+double dahl_partition__utils__lbell(int32_t n);
