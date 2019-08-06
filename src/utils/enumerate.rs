@@ -19,9 +19,10 @@ mod tests {
 
     #[test]
     fn test_enumerate() {
-        let mut ph = PartitionsHolder::allocated(4, 2, true);
+        let mut ph = PartitionsHolder::allocated(4, 3, true);
         let mut phv = ph.view();
-        //enumerate(&mut phv);
+        enumerate(&mut phv);
+        println!("{}", phv.to_string());
         //assert_eq!(phv.to_string(), "1");
     }
 

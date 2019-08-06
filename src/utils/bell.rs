@@ -9,7 +9,7 @@ use std::f64;
 /// Computes the natural logarithm of the Bell number.
 ///
 pub fn lbell(n: usize) -> f64 {
-    let value = bell_engine(n);
+    let value = bell(n);
     let n_bits = value.bits();
     let threshold = 1022usize;
     let log2 = if n_bits > threshold {
@@ -26,12 +26,7 @@ pub fn lbell(n: usize) -> f64 {
     log2 / f64::consts::LOG2_E
 }
 
-pub fn bell(n: usize) -> Option<usize> {
-    let value = bell_engine(n);
-    value.to_usize()
-}
-
-fn bell_engine(n: usize) -> BigUint {
+pub fn bell(n: usize) -> BigUint {
     let mut r1: Vec<BigUint> = vec![Zero::zero(); n];
     let mut r2: Vec<BigUint> = vec![Zero::zero(); n];
     r1[0] = One::one();
@@ -54,6 +49,20 @@ pub extern "C" fn dahl_partition__utils__lbell(n: i32) -> f64 {
     }
     match usize::try_from(n) {
         Ok(n) => lbell(n),
+        Err(_) => f64::INFINITY,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn dahl_partition__utils__bell(n: i32) -> f64 {
+    if n < 0 {
+        return 0.0;
+    }
+    match usize::try_from(n) {
+        Ok(n) => match bell(n).to_f64() {
+            Some(v) => v,
+            None => f64::INFINITY,
+        },
         Err(_) => f64::INFINITY,
     }
 }

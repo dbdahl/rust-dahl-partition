@@ -21,4 +21,6 @@ void dahl_partition__summary__psm(int32_t n_partitions,
                                   int32_t *partitions_ptr,
                                   double *psm_ptr);
 
+double dahl_partition__utils__bell(int32_t n);
+
 double dahl_partition__utils__lbell(int32_t n);
