@@ -609,7 +609,6 @@ impl Iterator for PartitionIterator {
 #[cfg(test)]
 mod tests_iterator {
     use super::*;
-    use crate::structure::*;
     use crate::utils::bell;
     use num_traits::cast::ToPrimitive;
 
