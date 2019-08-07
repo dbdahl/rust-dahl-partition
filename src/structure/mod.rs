@@ -129,6 +129,15 @@ impl Partition {
         }
     }
 
+    pub fn iter(n_items: usize) -> PartitionIterator {
+        PartitionIterator {
+            n_items,
+            labels: vec![0; n_items],
+            max: vec![0; n_items],
+            done: false,
+        }
+    }
+
     /// Number of items that can be allocated to the partition.
     ///
     /// # Examples
@@ -555,6 +564,76 @@ mod tests_partition {
         let p2 = Partition::from("ABCRRRRRRD".as_bytes());
         assert_eq!(p0, p1);
         assert_ne!(p0, p2);
+    }
+}
+
+pub struct PartitionIterator {
+    n_items: usize,
+    labels: Vec<usize>,
+    max: Vec<usize>,
+    done: bool,
+}
+
+impl Iterator for PartitionIterator {
+    type Item = Vec<usize>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            None
+        } else {
+            let result = Some(self.labels.clone());
+            let mut i = self.n_items - 1;
+            while (i > 0) && (self.labels[i] == self.max[i - 1] + 1) {
+                self.labels[i] = 0;
+                self.max[i] = self.max[i - 1];
+                i -= 1;
+            }
+            if i == 0 {
+                self.done = true;
+                return result;
+            }
+            self.labels[i] += 1;
+            let m = self.max[i].max(self.labels[i]);
+            self.max[i] = m;
+            i += 1;
+            while i < self.n_items {
+                self.max[i] = m;
+                self.labels[i] = 0;
+                i += 1;
+            }
+            result
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests_iterator {
+    use super::*;
+    use crate::structure::*;
+    use crate::utils::bell;
+    use num_traits::cast::ToPrimitive;
+
+    fn test_iterator_engine(n_items: usize) {
+        let mut counter = 0usize;
+        for _ in Partition::iter(n_items) {
+            counter += 1;
+        }
+        assert_eq!(counter, bell(n_items).to_usize().unwrap());
+    }
+
+    #[test]
+    fn test_iterator() {
+        test_iterator_engine(1);
+        test_iterator_engine(2);
+        let mut ph = PartitionsHolder::with_capacity(5, 3);
+        for labels in Partition::iter(3) {
+            ph.push(&Partition::from(&labels[..]));
+        }
+        assert_eq!(
+            ph.view().data(),
+            &[0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 2]
+        );
+        test_iterator_engine(10);
     }
 }
 

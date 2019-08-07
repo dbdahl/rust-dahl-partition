@@ -52,10 +52,8 @@ mod tests {
         let mut ph = PartitionsHolder::allocated(4, 3, true);
         let mut phv = ph.view();
         // enumerate(&mut phv);
-        println!("{}", phv.to_string());
         let mut c = PartitionLabels::new();
         //for i in c {
-        //    println!("{}", i);
         //}
         //assert_eq!(phv.to_string(), "1");
     }
