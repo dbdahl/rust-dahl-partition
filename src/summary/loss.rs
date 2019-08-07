@@ -1,14 +1,31 @@
 use crate::structure::*;
 use crate::summary::psm::PairwiseSimilarityMatrixView;
-
 use std::slice;
 
-pub fn binder(
+pub fn binder_single(partition: &[usize], psm: &PairwiseSimilarityMatrixView) -> f64 {
+    let ni = partition.len();
+    assert_eq!(ni, psm.n_items());
+    let mut sum = 0.0;
+    for j in 0..ni {
+        for i in 0..j {
+            let p = unsafe { *psm.get_unchecked((i, j)) };
+            sum += if unsafe { *partition.get_unchecked(i) == *partition.get_unchecked(j) } {
+                1.0 - p
+            } else {
+                p
+            }
+        }
+    }
+    sum
+}
+
+pub fn binder_multiple(
     partitions: &PartitionsHolderView,
     psm: &PairwiseSimilarityMatrixView,
     results: &mut [f64],
 ) {
-    let ni = psm.n_items();
+    let ni = partitions.n_items();
+    assert_eq!(ni, psm.n_items());
     for k in 0..partitions.n_partitions() {
         let mut sum = 0.0;
         for j in 0..ni {
@@ -27,12 +44,34 @@ pub fn binder(
     }
 }
 
-pub fn vilb(
+pub fn vilb_single(partition: &[usize], psm: &PairwiseSimilarityMatrixView) -> f64 {
+    let ni = partition.len();
+    assert_eq!(ni, psm.n_items());
+    let mut sum = 0.0;
+    for i in 0..ni {
+        let mut s1 = 0u32;
+        let mut s2 = 0.0;
+        let mut s3 = 0.0;
+        for j in 0..ni {
+            let p = unsafe { *psm.get_unchecked((i, j)) };
+            s2 += p;
+            if unsafe { *partition.get_unchecked(i) == *partition.get_unchecked(j) } {
+                s1 += 1;
+                s3 += p;
+            }
+        }
+        sum += f64::from(s1).log2() + s2.log2() - 2.0 * s3.log2();
+    }
+    sum / (psm.n_items() as f64)
+}
+
+pub fn vilb_multiple(
     partitions: &PartitionsHolderView,
     psm: &PairwiseSimilarityMatrixView,
     results: &mut [f64],
 ) {
-    let ni = psm.n_items();
+    let ni = partitions.n_items();
+    assert_eq!(ni, psm.n_items());
     let sum2 = {
         let mut s1 = 0.0;
         for i in 0..ni {
@@ -77,8 +116,43 @@ pub unsafe extern "C" fn dahl_partition__summary__expected_loss(
     let psm = PairwiseSimilarityMatrixView::from_ptr(psm_ptr, ni);
     let results = slice::from_raw_parts_mut(results_ptr, np);
     match loss {
-        0 => binder(&partitions, &psm, results),
-        1 => vilb(&partitions, &psm, results),
+        0 => binder_multiple(&partitions, &psm, results),
+        1 => vilb_multiple(&partitions, &psm, results),
         _ => panic!("Unsupported loss method: {}", loss),
     };
+}
+
+#[cfg(test)]
+mod tests_loss {
+    use super::*;
+    use crate::distribution::crp::sample;
+
+    #[test]
+    fn test_binder() {
+        let n_partitions = 1000;
+        let n_items = 5;
+        let mass = 2.0;
+        let mut samples = PartitionsHolder::with_capacity(n_partitions, n_items);
+        for _ in 0..n_partitions {
+            samples.push_partition(&sample(n_items, mass));
+        }
+        let mut psm = crate::summary::psm(&samples.view(), true);
+        let samples_view = &samples.view();
+        let psm_view = &psm.view();
+        let mut results = vec![0.0; n_partitions];
+        binder_multiple(samples_view, psm_view, &mut results[..]);
+        for i in 0..n_items {
+            relative_eq!(
+                binder_single(&samples_view.get(i).labels()[..], psm_view),
+                results[i]
+            );
+        }
+        vilb_multiple(samples_view, psm_view, &mut results[..]);
+        for i in 0..n_items {
+            relative_eq!(
+                vilb_single(&samples_view.get(i).labels()[..], psm_view),
+                results[i]
+            );
+        }
+    }
 }

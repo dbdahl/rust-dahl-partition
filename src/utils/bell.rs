@@ -73,8 +73,8 @@ mod tests {
 
     #[test]
     fn test_lbell() {
-        assert!((lbell(220) - 714.4033).abs() < 0.001);
-        assert!((lbell(5).exp() - 52.0).abs() < 0.001);
+        relative_eq!(lbell(220), 714.4033);
+        relative_eq!(bell(5).to_f64().unwrap(), 52.0);
     }
 
 }
