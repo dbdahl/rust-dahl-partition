@@ -135,7 +135,25 @@ impl Partition {
             labels: vec![0; n_items],
             max: vec![0; n_items],
             done: false,
+            period: 1,
         }
+    }
+
+    pub fn iter_sharded(n_items: usize, n_shards: u32) -> Vec<PartitionIterator> {
+        let mut shards = Vec::with_capacity(n_shards as usize);
+        assert!(n_shards > 0);
+        for i in 0..n_shards {
+            let mut iter = PartitionIterator {
+                n_items,
+                labels: vec![0; n_items],
+                max: vec![0; n_items],
+                done: false,
+                period: n_shards,
+            };
+            iter.advance(i);
+            shards.push(iter);
+        }
+        shards
     }
 
     /// Number of items that can be allocated to the partition.
@@ -572,16 +590,12 @@ pub struct PartitionIterator {
     labels: Vec<usize>,
     max: Vec<usize>,
     done: bool,
+    period: u32,
 }
 
-impl Iterator for PartitionIterator {
-    type Item = Vec<usize>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.done {
-            None
-        } else {
-            let result = Some(self.labels.clone());
+impl PartitionIterator {
+    fn advance(&mut self, times: u32) {
+        for _ in 0..times {
             let mut i = self.n_items - 1;
             while (i > 0) && (self.labels[i] == self.max[i - 1] + 1) {
                 self.labels[i] = 0;
@@ -590,7 +604,7 @@ impl Iterator for PartitionIterator {
             }
             if i == 0 {
                 self.done = true;
-                return result;
+                return;
             }
             self.labels[i] += 1;
             let m = self.max[i].max(self.labels[i]);
@@ -601,6 +615,19 @@ impl Iterator for PartitionIterator {
                 self.labels[i] = 0;
                 i += 1;
             }
+        }
+    }
+}
+
+impl Iterator for PartitionIterator {
+    type Item = Vec<usize>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            None
+        } else {
+            let result = Some(self.labels.clone());
+            self.advance(self.period);
             result
         }
     }
