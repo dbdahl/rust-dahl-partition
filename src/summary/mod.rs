@@ -1,4 +1,5 @@
 pub mod loss;
+pub mod optimize;
 pub mod psm;
 
 pub use loss::binder_single as binder;
