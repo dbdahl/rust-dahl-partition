@@ -1082,7 +1082,7 @@ mod tests_partitions_holder {
         phf.push_partition(&Partition::from("ABCD".as_bytes()));
         phf.push_partition(&Partition::from("AABA".as_bytes()));
         assert_eq!(phf.n_partitions(), 3);
-        let mut phfv = phf.view();
+        let phfv = phf.view();
         assert_eq!(phfv.data(), &[0, 0, 1, 2, 0, 1, 2, 3, 0, 0, 1, 0]);
 
         let mut phf2 = PartitionsHolder::allocated(3, 4, false);
