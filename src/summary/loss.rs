@@ -44,6 +44,24 @@ pub fn binder_multiple(
     }
 }
 
+pub fn vilb_single_kernel(partition: &[usize], psm: &PairwiseSimilarityMatrixView) -> f64 {
+    let ni = partition.len();
+    assert_eq!(ni, psm.n_items());
+    let mut sum = 0.0;
+    for i in 0..ni {
+        let mut s1 = 0u32;
+        let mut s3 = 0.0;
+        for j in 0..ni {
+            if unsafe { *partition.get_unchecked(i) == *partition.get_unchecked(j) } {
+                s1 += 1;
+                s3 += unsafe { *psm.get_unchecked((i, j)) };
+            }
+        }
+        sum += f64::from(s1).log2() - 2.0 * s3.log2();
+    }
+    sum
+}
+
 pub fn vilb_single(partition: &[usize], psm: &PairwiseSimilarityMatrixView) -> f64 {
     let ni = partition.len();
     assert_eq!(ni, psm.n_items());
