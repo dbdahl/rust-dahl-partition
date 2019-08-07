@@ -44,7 +44,7 @@ mod tests {
         let mass = 2.0;
         let mut samples = PartitionsHolder::with_capacity(n_partitions, n_items);
         for _ in 0..n_partitions {
-            samples.push(&sample(n_items, mass));
+            samples.push_partition(&sample(n_items, mass));
         }
         let mut psm = crate::summary::psm(&samples.view(), true);
         let truth = 1.0 / (1.0 + mass);

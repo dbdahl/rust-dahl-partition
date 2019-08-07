@@ -1,61 +1,29 @@
 use crate::structure::*;
+use crate::utils::bell;
 
-pub fn enumerate(phv: &mut PartitionsHolderView) {
-    let n_partitions = phv.n_partitions();
-    let n_items = phv.n_items();
-    let mut state = vec![0; n_items];
-    let mut max = vec![0; n_items];
-    let mut i = n_items;
-    if i == n_items {
-        let partition = Partition::from(&state[..]);
-        phv.push(&partition);
-        i -= 1;
-        if state[i] < max[i] {
-            state[i] += 1;
-            i += 1;
-        } else {
-            state[i] = 0;
-            i -= 1;
-        }
+use num_traits::cast::ToPrimitive;
+use std::convert::TryFrom;
+
+pub fn enumerate(n_items: usize) -> PartitionsHolder {
+    let n_partitions = bell(n_items).to_usize().unwrap();
+    let mut ph = PartitionsHolder::with_capacity(n_partitions, n_items);
+    for partition in Partition::iter(n_items) {
+        ph.push_slice(&partition[..]);
+    }
+    ph
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dahl_partition__utils__enumerate(
+    n_partitions: i32,
+    n_items: i32,
+    partitions_ptr: *mut i32,
+) {
+    let n_partitions = usize::try_from(n_partitions).unwrap();
+    let n_items = usize::try_from(n_items).unwrap();
+    let mut phv = PartitionsHolderView::from_ptr(partitions_ptr, n_partitions, n_items, true);
+    for partition in Partition::iter(n_items) {
+        phv.push_slice(&partition[..]);
     }
 }
 
-struct PartitionLabels {
-    count: u32,
-}
-
-impl PartitionLabels {
-    fn new() -> PartitionLabels {
-        PartitionLabels { count: 0 }
-    }
-}
-
-impl Iterator for PartitionLabels {
-    type Item = u32;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.count += 1;
-        if self.count < 6 {
-            Some(self.count)
-        } else {
-            None
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_enumerate() {
-        let mut ph = PartitionsHolder::allocated(4, 3, true);
-        let mut phv = ph.view();
-        // enumerate(&mut phv);
-        let mut c = PartitionLabels::new();
-        //for i in c {
-        //}
-        //assert_eq!(phv.to_string(), "1");
-    }
-
-}
