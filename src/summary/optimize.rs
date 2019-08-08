@@ -8,20 +8,10 @@ use std::convert::TryFrom;
 use std::slice;
 use std::sync::mpsc;
 
-pub fn minimize_binder_by_enumeration(psm: &PairwiseSimilarityMatrixView) -> Vec<usize> {
-    let mut working_minimum = std::f64::INFINITY;
-    let mut working_minimizer = vec![0usize; psm.n_items()];
-    for partition in Partition::iter(psm.n_items()) {
-        let value = binder_single(&partition[..], psm);
-        if value < working_minimum {
-            working_minimum = value;
-            working_minimizer = partition;
-        }
-    }
-    working_minimizer
-}
-
-pub fn minimize_vilb_by_enumeration(psm: &PairwiseSimilarityMatrixView<'_>) -> Vec<usize> {
+pub fn minimize_by_enumeration(
+    f: fn(&[usize], &PairwiseSimilarityMatrixView) -> f64,
+    psm: &PairwiseSimilarityMatrixView,
+) -> Vec<usize> {
     let (tx, rx) = mpsc::channel();
     crossbeam::scope(|s| {
         for iter in Partition::iter_sharded(num_cpus::get() as u32, psm.n_items()) {
@@ -30,7 +20,7 @@ pub fn minimize_vilb_by_enumeration(psm: &PairwiseSimilarityMatrixView<'_>) -> V
                 let mut working_minimum = std::f64::INFINITY;
                 let mut working_minimizer = vec![0usize; psm.n_items()];
                 for partition in iter {
-                    let value = vilb_single_kernel(&partition[..], psm);
+                    let value = f(&partition[..], psm);
                     if value < working_minimum {
                         working_minimum = value;
                         working_minimizer = partition;
@@ -45,7 +35,7 @@ pub fn minimize_vilb_by_enumeration(psm: &PairwiseSimilarityMatrixView<'_>) -> V
     let mut working_minimum = std::f64::INFINITY;
     let mut working_minimizer = vec![0usize; psm.n_items()];
     for partition in rx {
-        let value = vilb_single_kernel(&partition[..], psm);
+        let value = f(&partition[..], psm);
         if value < working_minimum {
             working_minimum = value;
             working_minimizer = partition;
@@ -61,13 +51,14 @@ pub unsafe extern "C" fn dahl_partition__summary__minimize_by_enumeration(
     loss: i32,
     results_ptr: *mut i32,
 ) {
-    let ni = n_items as usize;
+    let ni = usize::try_from(n_items).unwrap();
     let psm = PairwiseSimilarityMatrixView::from_ptr(psm_ptr, ni);
-    let minimizer = match loss {
-        0 => minimize_binder_by_enumeration(&psm),
-        1 => minimize_vilb_by_enumeration(&psm),
+    let f = match loss {
+        0 => binder_single,
+        1 => vilb_single_kernel,
         _ => panic!("Unsupported loss method: {}", loss),
     };
+    let minimizer = minimize_by_enumeration(f, &psm);
     let results_slice = slice::from_raw_parts_mut(results_ptr, ni);
     for (i, v) in minimizer.iter().enumerate() {
         results_slice[i] = i32::try_from(*v).unwrap();
