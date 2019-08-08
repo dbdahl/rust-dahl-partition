@@ -139,7 +139,7 @@ impl Partition {
         }
     }
 
-    pub fn iter_sharded(n_items: usize, n_shards: u32) -> Vec<PartitionIterator> {
+    pub fn iter_sharded(n_shards: u32, n_items: usize) -> Vec<PartitionIterator> {
         let mut shards = Vec::with_capacity(n_shards as usize);
         assert!(n_shards > 0);
         for i in 0..n_shards {
@@ -661,6 +661,21 @@ mod tests_iterator {
         );
         test_iterator_engine(10);
     }
+
+    #[test]
+    fn test_sharded() {
+        let mut ph = PartitionsHolder::new(3);
+        for iter in Partition::iter_sharded(8, 3) {
+            for labels in iter {
+                ph.push_slice(&labels[..]);
+            }
+        }
+        assert_eq!(
+            ph.view().data(),
+            &[0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 2]
+        );
+    }
+
 }
 
 /// A data structure representing sets of integers.  The user instantiates subsets through
