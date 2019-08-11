@@ -26,9 +26,23 @@ pub fn lbell(n: usize) -> f64 {
     log2 / f64::consts::LOG2_E
 }
 
+use std::ffi::CString;
+use std::os::raw::c_char;
+extern "C" {
+    fn Rprintf(fmt: *const c_char);
+}
+
+pub fn rprintf(x: &String) {
+    let x2 = CString::new(&x[..]).expect("Invalid string.");
+    unsafe {
+        Rprintf(x2.as_ptr());
+    }
+}
+
 pub fn bell(n: usize) -> BigUint {
     let mut r1: Vec<BigUint> = vec![Zero::zero(); n];
     let mut r2: Vec<BigUint> = vec![Zero::zero(); n];
+    rprintf(&format!("Hello from Rust {}", 3));
     r1[0] = One::one();
     for k in 1..n {
         r2[0] = r1[k - 1].clone();
