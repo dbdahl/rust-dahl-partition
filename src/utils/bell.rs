@@ -42,7 +42,7 @@ pub fn rprintf(x: &String) {
 pub fn bell(n: usize) -> BigUint {
     let mut r1: Vec<BigUint> = vec![Zero::zero(); n];
     let mut r2: Vec<BigUint> = vec![Zero::zero(); n];
-    rprintf(&format!("Hello from Rust {}", 3));
+    rprintf(&format!("HelloRust {}", 4));
     r1[0] = One::one();
     for k in 1..n {
         r2[0] = r1[k - 1].clone();
