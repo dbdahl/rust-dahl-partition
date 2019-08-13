@@ -9,6 +9,7 @@ use std::f64;
 /// Computes the natural logarithm of the Bell number.
 ///
 pub fn lbell(n: usize) -> f64 {
+    rprintf(&format!("HR{}", 5));
     let value = bell(n);
     let n_bits = value.bits();
     let threshold = 1022usize;
@@ -42,7 +43,6 @@ pub fn rprintf(x: &String) {
 pub fn bell(n: usize) -> BigUint {
     let mut r1: Vec<BigUint> = vec![Zero::zero(); n];
     let mut r2: Vec<BigUint> = vec![Zero::zero(); n];
-    rprintf(&format!("HelloRust {}", 4));
     r1[0] = One::one();
     for k in 1..n {
         r2[0] = r1[k - 1].clone();
