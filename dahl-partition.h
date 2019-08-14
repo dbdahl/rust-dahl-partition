@@ -20,6 +20,12 @@ void dahl_partition__summary__minimize_by_enumeration(int32_t n_items,
                                                       int32_t loss,
                                                       int32_t *results_ptr);
 
+void dahl_partition__summary__minimize_by_salso(int32_t n_items,
+                                                double *psm_ptr,
+                                                uintptr_t n_candidates,
+                                                int32_t loss,
+                                                int32_t *results_ptr);
+
 void dahl_partition__summary__psm(int32_t n_partitions,
                                   int32_t n_items,
                                   int32_t parallel,
