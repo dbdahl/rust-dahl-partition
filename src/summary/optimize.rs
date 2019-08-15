@@ -18,13 +18,49 @@ pub fn minimize_by_salso(
     candidates: usize,
     max_size: usize,
     max_scans: usize,
-) -> (Vec<usize>, usize) {
-    let ni = psm.n_items();
+    parallel: bool,
+) -> (Vec<usize>, f64, usize) {
     let max_label = if max_size == 0 {
         usize::max_value()
     } else {
         max_size - 1
     };
+    if !parallel {
+        salso_engine(f, g, psm, candidates, max_label, max_scans)
+    } else {
+        let (tx, rx) = mpsc::channel();
+        let n_cores = num_cpus::get();
+        let candidates = (candidates + n_cores - 1) / n_cores;
+        crossbeam::scope(|s| {
+            for _ in 0..n_cores {
+                let tx = mpsc::Sender::clone(&tx);
+                s.spawn(move |_| {
+                    tx.send(salso_engine(f, g, psm, candidates, max_label, max_scans))
+                        .unwrap();
+                });
+            }
+        })
+        .unwrap();
+        std::mem::drop(tx); // Because of the cloning in the loop.
+        let mut working_best = (vec![0usize; psm.n_items()], std::f64::INFINITY, 0);
+        for candidate in rx {
+            if candidate.1 < working_best.1 {
+                working_best = candidate;
+            }
+        }
+        working_best
+    }
+}
+
+pub fn salso_engine(
+    f: fn(&[usize], &[usize], usize, usize, &PairwiseSimilarityMatrixView) -> f64,
+    g: fn(&[usize], &PairwiseSimilarityMatrixView) -> f64,
+    psm: &PairwiseSimilarityMatrixView,
+    candidates: usize,
+    max_label: usize,
+    max_scans: usize,
+) -> (Vec<usize>, f64, usize) {
+    let ni = psm.n_items();
     let mut global_minimum = std::f64::INFINITY;
     let mut global_best: Vec<usize> = vec![0; ni];
     let mut global_n_scans = 0;
@@ -93,7 +129,11 @@ pub fn minimize_by_salso(
         }
     }
     // Canonicalize the labels
-    (Partition::from(&global_best[..]).labels(), global_n_scans)
+    (
+        Partition::from(&global_best[..]).labels(),
+        global_minimum,
+        global_n_scans,
+    )
 }
 
 pub fn minimize_by_enumeration(
@@ -136,12 +176,14 @@ pub fn minimize_by_enumeration(
 pub unsafe extern "C" fn dahl_partition__summary__minimize_by_salso(
     n_items: i32,
     psm_ptr: *mut f64,
-    candidates: usize,
-    max_size: usize,
-    max_scans: usize,
+    candidates: i32,
+    max_size: i32,
+    max_scans: i32,
     loss: i32,
+    parallel: i32,
     results_labels_ptr: *mut i32,
-    results_n_scans_ptr: *mut i32,
+    results_expected_loss_ptr: *mut f64,
+    results_scans_ptr: *mut i32,
 ) {
     let ni = usize::try_from(n_items).unwrap();
     let psm = PairwiseSimilarityMatrixView::from_ptr(psm_ptr, ni);
@@ -150,12 +192,21 @@ pub unsafe extern "C" fn dahl_partition__summary__minimize_by_salso(
         //1 => vilb_single_partital,
         _ => panic!("Unsupported loss method: {}", loss),
     };
-    let (minimizer, n_scans) = minimize_by_salso(f, g, &psm, candidates, max_size, max_scans);
+    let (minimizer, expected_loss, scans) = minimize_by_salso(
+        f,
+        g,
+        &psm,
+        usize::try_from(candidates).unwrap(),
+        usize::try_from(max_size).unwrap(),
+        usize::try_from(max_scans).unwrap(),
+        parallel != 0,
+    );
     let results_slice = slice::from_raw_parts_mut(results_labels_ptr, ni);
     for (i, v) in minimizer.iter().enumerate() {
         results_slice[i] = i32::try_from(*v).unwrap();
     }
-    *results_n_scans_ptr = i32::try_from(n_scans).unwrap();
+    *results_expected_loss_ptr = expected_loss;
+    *results_scans_ptr = i32::try_from(scans).unwrap();
 }
 
 #[no_mangle]

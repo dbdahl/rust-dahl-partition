@@ -20,16 +20,18 @@ void dahl_partition__summary__expected_loss(int32_t n_partitions,
 void dahl_partition__summary__minimize_by_enumeration(int32_t n_items,
                                                       double *psm_ptr,
                                                       int32_t loss,
-                                                      int32_t *results_ptr);
+                                                      int32_t *results_label_ptr);
 
 void dahl_partition__summary__minimize_by_salso(int32_t n_items,
                                                 double *psm_ptr,
-                                                uintptr_t n_candidates,
-                                                uintptr_t max_size,
-                                                uintptr_t max_n_scans,
+                                                int32_t candidates,
+                                                int32_t max_size,
+                                                int32_t max_scans,
                                                 int32_t loss,
-                                                int32_t *results_ptr,
-                                                int32_t *results_n_scans_ptr);
+                                                int32_t parallel,
+                                                int32_t *results_labels_ptr,
+                                                double *results_expected_loss_ptr,
+                                                int32_t *results_scans_ptr);
 
 void dahl_partition__summary__psm(int32_t n_partitions,
                                   int32_t n_items,
