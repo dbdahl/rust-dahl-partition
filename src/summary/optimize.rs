@@ -14,9 +14,9 @@ use std::sync::mpsc;
 pub fn minimize_by_salso(
     f: fn(&[usize], &[usize], usize, usize, &PairwiseSimilarityMatrixView) -> f64,
     g: fn(&[usize], &PairwiseSimilarityMatrixView) -> f64,
+    max_size: usize,
     psm: &PairwiseSimilarityMatrixView,
     candidates: usize,
-    max_size: usize,
     max_scans: usize,
     parallel: bool,
 ) -> (Vec<usize>, f64, usize) {
@@ -177,9 +177,9 @@ pub unsafe extern "C" fn dahl_partition__summary__minimize_by_salso(
     n_items: i32,
     psm_ptr: *mut f64,
     candidates: i32,
-    max_size: i32,
     max_scans: i32,
     loss: i32,
+    max_size: i32,
     parallel: i32,
     results_labels_ptr: *mut i32,
     results_expected_loss_ptr: *mut f64,
@@ -195,9 +195,9 @@ pub unsafe extern "C" fn dahl_partition__summary__minimize_by_salso(
     let (minimizer, expected_loss, scans) = minimize_by_salso(
         f,
         g,
+        usize::try_from(max_size).unwrap(),
         &psm,
         usize::try_from(candidates).unwrap(),
-        usize::try_from(max_size).unwrap(),
         usize::try_from(max_scans).unwrap(),
         parallel != 0,
     );
