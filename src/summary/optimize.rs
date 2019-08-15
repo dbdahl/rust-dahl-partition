@@ -12,19 +12,22 @@ use std::slice;
 use std::sync::mpsc;
 
 pub fn minimize_by_salso(
-    f: fn(&[usize], &[usize], usize, &PairwiseSimilarityMatrixView) -> f64,
+    f: fn(&[usize], &[usize], usize, usize, &PairwiseSimilarityMatrixView) -> f64,
     g: fn(&[usize], &PairwiseSimilarityMatrixView) -> f64,
     psm: &PairwiseSimilarityMatrixView,
     n_candidates: usize,
-) -> Vec<usize> {
+    max_n_scans: usize,
+) -> (Vec<usize>, usize) {
     let ni = psm.n_items();
     let mut global_minimum = std::f64::INFINITY;
     let mut global_best: Vec<usize> = vec![0; ni];
+    let mut global_n_scans = 0;
     let mut partition: Vec<usize> = vec![0; ni];
     let mut permutation: Vec<usize> = (0..ni).collect();
     let mut rng = thread_rng();
     for _ in 0..n_candidates {
         permutation.shuffle(&mut rng);
+        // Initial allocation
         partition[unsafe { *permutation.get_unchecked(0) }] = 0;
         let mut max: usize = 0;
         for n_allocated in 2..=ni {
@@ -33,7 +36,13 @@ pub fn minimize_by_salso(
             let mut index = 0;
             for l in 0..=(max + 1) {
                 partition[ii] = l;
-                let value = f(&partition[..], &permutation[..], n_allocated, psm);
+                let value = f(
+                    &partition[..],
+                    &permutation[..],
+                    n_allocated - 1,
+                    n_allocated,
+                    psm,
+                );
                 if value < minimum {
                     minimum = value;
                     index = l;
@@ -44,13 +53,40 @@ pub fn minimize_by_salso(
             }
             partition[ii] = index;
         }
+        // Sweetening scans
+        let mut n_scans = max_n_scans;
+        for scan in 0..max_n_scans {
+            let previous = partition.clone();
+            for i in 0..ni {
+                let ii = unsafe { *permutation.get_unchecked(i) };
+                let mut minimum = std::f64::INFINITY;
+                let mut index = 0;
+                for l in 0..=(max + 1) {
+                    partition[ii] = l;
+                    let value = f(&partition[..], &permutation[..], i, ni, psm);
+                    if value < minimum {
+                        minimum = value;
+                        index = l;
+                    }
+                }
+                if index > max {
+                    max = index;
+                }
+                partition[ii] = index;
+            }
+            if partition == previous {
+                n_scans = scan + 1;
+                break;
+            }
+        }
         let value = g(&partition[..], psm);
         if value < global_minimum {
             global_minimum = value;
             global_best = partition.clone();
+            global_n_scans = n_scans;
         }
     }
-    global_best
+    (Partition::from(&global_best[..]).labels(), global_n_scans)
 }
 
 pub fn minimize_by_enumeration(
@@ -94,8 +130,10 @@ pub unsafe extern "C" fn dahl_partition__summary__minimize_by_salso(
     n_items: i32,
     psm_ptr: *mut f64,
     n_candidates: usize,
+    max_n_scans: usize,
     loss: i32,
     results_ptr: *mut i32,
+    results_n_scans_ptr: *mut i32,
 ) {
     let ni = usize::try_from(n_items).unwrap();
     let psm = PairwiseSimilarityMatrixView::from_ptr(psm_ptr, ni);
@@ -104,11 +142,12 @@ pub unsafe extern "C" fn dahl_partition__summary__minimize_by_salso(
         //1 => vilb_single_partital,
         _ => panic!("Unsupported loss method: {}", loss),
     };
-    let minimizer = minimize_by_salso(f, g, &psm, n_candidates);
+    let (minimizer, n_scans) = minimize_by_salso(f, g, &psm, n_candidates, max_n_scans);
     let results_slice = slice::from_raw_parts_mut(results_ptr, ni);
     for (i, v) in minimizer.iter().enumerate() {
         results_slice[i] = i32::try_from(*v).unwrap();
     }
+    *results_n_scans_ptr = i32::try_from(n_scans).unwrap();
 }
 
 #[no_mangle]

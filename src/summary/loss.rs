@@ -8,14 +8,15 @@ use std::slice;
 pub fn binder_single_partitial(
     partition: &[usize],
     permutation: &[usize],
+    index: usize,
     n_allocated: usize,
     psm: &PairwiseSimilarityMatrixView,
 ) -> f64 {
-    let j = n_allocated - 1;
+    let j = index;
     let jj = unsafe { *permutation.get_unchecked(j) };
     let jj_label = unsafe { *partition.get_unchecked(jj) };
     let mut sum = 0.0;
-    for i in 0..j {
+    for i in 0..n_allocated {
         let ii = unsafe { *permutation.get_unchecked(i) };
         let p = unsafe { *psm.get_unchecked((ii, jj)) };
         sum += if unsafe { *partition.get_unchecked(ii) == jj_label } {
