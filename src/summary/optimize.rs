@@ -15,18 +15,23 @@ pub fn minimize_by_salso(
     f: fn(&[usize], &[usize], usize, usize, &PairwiseSimilarityMatrixView) -> f64,
     g: fn(&[usize], &PairwiseSimilarityMatrixView) -> f64,
     psm: &PairwiseSimilarityMatrixView,
-    n_candidates: usize,
+    candidates: usize,
     max_size: usize,
-    max_n_scans: usize,
+    max_scans: usize,
 ) -> (Vec<usize>, usize) {
     let ni = psm.n_items();
+    let max_label = if max_size == 0 {
+        usize::max_value()
+    } else {
+        max_size - 1
+    };
     let mut global_minimum = std::f64::INFINITY;
     let mut global_best: Vec<usize> = vec![0; ni];
     let mut global_n_scans = 0;
     let mut partition: Vec<usize> = vec![0; ni];
     let mut permutation: Vec<usize> = (0..ni).collect();
     let mut rng = thread_rng();
-    for _ in 0..n_candidates {
+    for _ in 0..candidates {
         permutation.shuffle(&mut rng);
         // Initial allocation
         partition[unsafe { *permutation.get_unchecked(0) }] = 0;
@@ -35,7 +40,7 @@ pub fn minimize_by_salso(
             let ii = unsafe { *permutation.get_unchecked(n_allocated - 1) };
             let mut minimum = std::f64::INFINITY;
             let mut index = 0;
-            for l in 0..=(max + 1).min(max_size) {
+            for l in 0..=(max + 1).min(max_label) {
                 partition[ii] = l;
                 let value = f(
                     &partition[..],
@@ -55,14 +60,14 @@ pub fn minimize_by_salso(
             partition[ii] = index;
         }
         // Sweetening scans
-        let mut n_scans = max_n_scans;
-        for scan in 0..max_n_scans {
+        let mut n_scans = max_scans;
+        for scan in 0..max_scans {
             let previous = partition.clone();
             for i in 0..ni {
                 let ii = unsafe { *permutation.get_unchecked(i) };
                 let mut minimum = std::f64::INFINITY;
                 let mut index = 0;
-                for l in 0..=(max + 1).min(max_size) {
+                for l in 0..=(max + 1).min(max_label) {
                     partition[ii] = l;
                     let value = f(&partition[..], &permutation[..], i, ni, psm);
                     if value < minimum {
@@ -131,11 +136,11 @@ pub fn minimize_by_enumeration(
 pub unsafe extern "C" fn dahl_partition__summary__minimize_by_salso(
     n_items: i32,
     psm_ptr: *mut f64,
-    n_candidates: usize,
+    candidates: usize,
     max_size: usize,
-    max_n_scans: usize,
+    max_scans: usize,
     loss: i32,
-    results_ptr: *mut i32,
+    results_labels_ptr: *mut i32,
     results_n_scans_ptr: *mut i32,
 ) {
     let ni = usize::try_from(n_items).unwrap();
@@ -145,8 +150,8 @@ pub unsafe extern "C" fn dahl_partition__summary__minimize_by_salso(
         //1 => vilb_single_partital,
         _ => panic!("Unsupported loss method: {}", loss),
     };
-    let (minimizer, n_scans) = minimize_by_salso(f, g, &psm, n_candidates, max_size, max_n_scans);
-    let results_slice = slice::from_raw_parts_mut(results_ptr, ni);
+    let (minimizer, n_scans) = minimize_by_salso(f, g, &psm, candidates, max_size, max_scans);
+    let results_slice = slice::from_raw_parts_mut(results_labels_ptr, ni);
     for (i, v) in minimizer.iter().enumerate() {
         results_slice[i] = i32::try_from(*v).unwrap();
     }
@@ -158,7 +163,7 @@ pub unsafe extern "C" fn dahl_partition__summary__minimize_by_enumeration(
     n_items: i32,
     psm_ptr: *mut f64,
     loss: i32,
-    results_ptr: *mut i32,
+    results_label_ptr: *mut i32,
 ) {
     let ni = usize::try_from(n_items).unwrap();
     let psm = PairwiseSimilarityMatrixView::from_ptr(psm_ptr, ni);
@@ -168,7 +173,7 @@ pub unsafe extern "C" fn dahl_partition__summary__minimize_by_enumeration(
         _ => panic!("Unsupported loss method: {}", loss),
     };
     let minimizer = minimize_by_enumeration(f, &psm);
-    let results_slice = slice::from_raw_parts_mut(results_ptr, ni);
+    let results_slice = slice::from_raw_parts_mut(results_label_ptr, ni);
     for (i, v) in minimizer.iter().enumerate() {
         results_slice[i] = i32::try_from(*v).unwrap();
     }
