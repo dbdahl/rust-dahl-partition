@@ -11,14 +11,14 @@ pub fn binder_single_partitial(
     n_allocated: usize,
     psm: &PairwiseSimilarityMatrixView,
 ) -> f64 {
-    assert!(n_allocated <= psm.n_items());
-    let mut sum = 0.0;
     let j = n_allocated - 1;
     let jj = unsafe { *permutation.get_unchecked(j) };
+    let jj_label = unsafe { *partition.get_unchecked(jj) };
+    let mut sum = 0.0;
     for i in 0..j {
         let ii = unsafe { *permutation.get_unchecked(i) };
         let p = unsafe { *psm.get_unchecked((ii, jj)) };
-        sum += if unsafe { *partition.get_unchecked(ii) == *partition.get_unchecked(jj) } {
+        sum += if unsafe { *partition.get_unchecked(ii) == jj_label } {
             1.0 - p
         } else {
             p

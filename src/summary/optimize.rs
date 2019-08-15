@@ -21,13 +21,10 @@ pub fn minimize_by_salso(
     let mut global_minimum = std::f64::INFINITY;
     let mut global_best: Vec<usize> = vec![0; ni];
     let mut partition: Vec<usize> = vec![0; ni];
+    let mut permutation: Vec<usize> = (0..ni).collect();
+    let mut rng = thread_rng();
     for _ in 0..n_candidates {
-        let permutation = {
-            let mut perm: Vec<usize> = (0..ni).collect();
-            let mut rng = thread_rng();
-            perm.shuffle(&mut rng);
-            perm
-        };
+        permutation.shuffle(&mut rng);
         let mut max: usize = 0;
         for n_allocated in 2..=ni {
             let ii = unsafe { *permutation.get_unchecked(n_allocated - 1) };
