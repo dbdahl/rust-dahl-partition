@@ -19,7 +19,8 @@ pub fn minimize_by_salso(
 ) -> Vec<usize> {
     let ni = psm.n_items();
     let mut global_minimum = std::f64::INFINITY;
-    let mut global_best = None;
+    let mut global_best: Vec<usize> = vec![0; ni];
+    let mut partition: Vec<usize> = vec![0; ni];
     for _ in 0..n_candidates {
         let permutation = {
             let mut perm: Vec<usize> = (0..ni).collect();
@@ -27,7 +28,6 @@ pub fn minimize_by_salso(
             perm.shuffle(&mut rng);
             perm
         };
-        let mut partition: Vec<usize> = vec![0; ni];
         let mut max: usize = 0;
         for n_allocated in 2..=ni {
             let ii = unsafe { *permutation.get_unchecked(n_allocated - 1) };
@@ -49,10 +49,10 @@ pub fn minimize_by_salso(
         let value = g(&partition[..], psm);
         if value < global_minimum {
             global_minimum = value;
-            global_best = Some(partition);
+            global_best = partition.clone();
         }
     }
-    global_best.unwrap()
+    global_best
 }
 
 pub fn minimize_by_enumeration(
