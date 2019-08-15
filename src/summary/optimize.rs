@@ -16,6 +16,7 @@ pub fn minimize_by_salso(
     g: fn(&[usize], &PairwiseSimilarityMatrixView) -> f64,
     psm: &PairwiseSimilarityMatrixView,
     n_candidates: usize,
+    max_size: usize,
     max_n_scans: usize,
 ) -> (Vec<usize>, usize) {
     let ni = psm.n_items();
@@ -34,7 +35,7 @@ pub fn minimize_by_salso(
             let ii = unsafe { *permutation.get_unchecked(n_allocated - 1) };
             let mut minimum = std::f64::INFINITY;
             let mut index = 0;
-            for l in 0..=(max + 1) {
+            for l in 0..=(max + 1).min(max_size) {
                 partition[ii] = l;
                 let value = f(
                     &partition[..],
@@ -61,7 +62,7 @@ pub fn minimize_by_salso(
                 let ii = unsafe { *permutation.get_unchecked(i) };
                 let mut minimum = std::f64::INFINITY;
                 let mut index = 0;
-                for l in 0..=(max + 1) {
+                for l in 0..=(max + 1).min(max_size) {
                     partition[ii] = l;
                     let value = f(&partition[..], &permutation[..], i, ni, psm);
                     if value < minimum {
@@ -86,6 +87,7 @@ pub fn minimize_by_salso(
             global_n_scans = n_scans;
         }
     }
+    // Canonicalize the labels
     (Partition::from(&global_best[..]).labels(), global_n_scans)
 }
 
@@ -130,6 +132,7 @@ pub unsafe extern "C" fn dahl_partition__summary__minimize_by_salso(
     n_items: i32,
     psm_ptr: *mut f64,
     n_candidates: usize,
+    max_size: usize,
     max_n_scans: usize,
     loss: i32,
     results_ptr: *mut i32,
@@ -142,7 +145,7 @@ pub unsafe extern "C" fn dahl_partition__summary__minimize_by_salso(
         //1 => vilb_single_partital,
         _ => panic!("Unsupported loss method: {}", loss),
     };
-    let (minimizer, n_scans) = minimize_by_salso(f, g, &psm, n_candidates, max_n_scans);
+    let (minimizer, n_scans) = minimize_by_salso(f, g, &psm, n_candidates, max_size, max_n_scans);
     let results_slice = slice::from_raw_parts_mut(results_ptr, ni);
     for (i, v) in minimizer.iter().enumerate() {
         results_slice[i] = i32::try_from(*v).unwrap();
