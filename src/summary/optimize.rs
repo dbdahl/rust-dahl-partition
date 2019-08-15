@@ -25,6 +25,7 @@ pub fn minimize_by_salso(
     let mut rng = thread_rng();
     for _ in 0..n_candidates {
         permutation.shuffle(&mut rng);
+        partition[unsafe { *permutation.get_unchecked(0) }] = 0;
         let mut max: usize = 0;
         for n_allocated in 2..=ni {
             let ii = unsafe { *permutation.get_unchecked(n_allocated - 1) };
