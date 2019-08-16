@@ -77,16 +77,17 @@ pub fn vilb_single_partial(
     n_allocated: usize,
     psm: &PairwiseSimilarityMatrixView,
 ) -> f64 {
-    let ni = partition.len();
-    assert_eq!(ni, psm.n_items());
     let mut sum = 0.0;
-    for i in 0..ni {
+    for i in 0..n_allocated {
+        let ii = unsafe { *permutation.get_unchecked(i) };
+        let ii_label = unsafe { *partition.get_unchecked(ii) };
         let mut s1 = 0u32;
         let mut s3 = 0.0;
-        for j in 0..ni {
-            if unsafe { *partition.get_unchecked(i) == *partition.get_unchecked(j) } {
+        for j in 0..n_allocated {
+            let jj = unsafe { *permutation.get_unchecked(j) };
+            if unsafe { *partition.get_unchecked(jj) == ii_label } {
                 s1 += 1;
-                s3 += unsafe { *psm.get_unchecked((i, j)) };
+                s3 += unsafe { *psm.get_unchecked((ii, jj)) };
             }
         }
         sum += f64::from(s1).log2() - 2.0 * s3.log2();
