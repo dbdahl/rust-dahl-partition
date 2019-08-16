@@ -77,22 +77,38 @@ pub fn vilb_single_partial(
     n_allocated: usize,
     psm: &PairwiseSimilarityMatrixView,
 ) -> f64 {
-    let mut sum = 0.0;
-    for i in 0..n_allocated {
-        let ii = unsafe { *permutation.get_unchecked(i) };
-        let ii_label = unsafe { *partition.get_unchecked(ii) };
-        let mut s1 = 0u32;
-        let mut s3 = 0.0;
-        for j in 0..n_allocated {
-            let jj = unsafe { *permutation.get_unchecked(j) };
-            if unsafe { *partition.get_unchecked(jj) == ii_label } {
-                s1 += 1;
-                s3 += unsafe { *psm.get_unchecked((ii, jj)) };
+    let i = index;
+    let ii = unsafe { *permutation.get_unchecked(i) };
+    let ii_label = unsafe { *partition.get_unchecked(ii) };
+    let members: Vec<_> = (0..n_allocated)
+        .map(|j| unsafe { *permutation.get_unchecked(j) })
+        .filter(|jj| unsafe { *partition.get_unchecked(*jj) } == ii_label)
+        .collect();
+    let mut s_with = 0.0;
+    let mut s_without = 0.0;
+    for kk1 in members.iter() {
+        let mut s1 = 0.0;
+        let mut s2 = 0.0;
+        for kk2 in members.iter() {
+            let p = unsafe { *psm.get_unchecked((*kk1, *kk2)) };
+            s1 += p;
+            if *kk2 != ii {
+                s2 += p;
             }
         }
-        sum += f64::from(s1).log2() - 2.0 * s3.log2();
+        s_with += s1.log2();
+        if *kk1 != ii {
+            s_without += s2.log2();
+        }
     }
-    sum
+    let size = members.len() as f64;
+    let with = size * size.log2() - 2.0 * s_with;
+    let without = (size - 1.0) * (size - 1.0).log2() - 2.0 * s_without;
+    if members.len() > 1 {
+        with - without
+    } else {
+        with
+    }
 }
 
 pub fn vilb_single_kernel(partition: &[usize], psm: &PairwiseSimilarityMatrixView) -> f64 {
