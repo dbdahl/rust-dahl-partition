@@ -3,8 +3,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-extern void Rprintf(const char *fmt);
-
 void dahl_partition__distribution__crp__sample(int32_t n_partitions,
                                                int32_t n_items,
                                                double mass,
@@ -31,7 +29,8 @@ void dahl_partition__summary__minimize_by_salso(int32_t n_items,
                                                 int32_t parallel,
                                                 int32_t *results_labels_ptr,
                                                 double *results_expected_loss_ptr,
-                                                int32_t *results_scans_ptr);
+                                                int32_t *results_scans_ptr,
+                                                int32_t *results_actual_n_candidates_ptr);
 
 void dahl_partition__summary__psm(int32_t n_partitions,
                                   int32_t n_items,

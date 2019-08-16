@@ -21,14 +21,17 @@ pub fn minimize_by_salso(
     candidates: usize,
     max_scans: usize,
     parallel: bool,
-) -> (Vec<usize>, f64, usize) {
+) -> ((Vec<usize>, f64, usize), usize) {
     let max_label = if max_size == 0 {
         usize::max_value()
     } else {
         max_size - 1
     };
     if !parallel {
-        salso_engine(f, g, psm, candidates, max_label, max_scans)
+        (
+            salso_engine(f, g, psm, candidates, max_label, max_scans),
+            candidates,
+        )
     } else {
         let (tx, rx) = mpsc::channel();
         let n_cores = num_cpus::get();
@@ -50,7 +53,7 @@ pub fn minimize_by_salso(
                 working_best = candidate;
             }
         }
-        working_best
+        (working_best, candidates * n_cores)
     }
 }
 
@@ -186,6 +189,7 @@ pub unsafe extern "C" fn dahl_partition__summary__minimize_by_salso(
     results_labels_ptr: *mut i32,
     results_expected_loss_ptr: *mut f64,
     results_scans_ptr: *mut i32,
+    results_actual_n_candidates_ptr: *mut i32,
 ) {
     let ni = usize::try_from(n_items).unwrap();
     let psm = PairwiseSimilarityMatrixView::from_ptr(psm_ptr, ni);
@@ -193,7 +197,7 @@ pub unsafe extern "C" fn dahl_partition__summary__minimize_by_salso(
     let candidates = usize::try_from(candidates).unwrap();
     let max_scans = usize::try_from(max_scans).unwrap();
     let parallel = parallel != 0;
-    let (minimizer, expected_loss, scans) = match loss {
+    let ((minimizer, expected_loss, scans), actual_n_candidates) = match loss {
         0 => minimize_by_salso(
             binder_single_partial,
             binder_single,
@@ -220,6 +224,7 @@ pub unsafe extern "C" fn dahl_partition__summary__minimize_by_salso(
     }
     *results_expected_loss_ptr = expected_loss;
     *results_scans_ptr = i32::try_from(scans).unwrap();
+    *results_actual_n_candidates_ptr = i32::try_from(actual_n_candidates).unwrap();
 }
 
 #[no_mangle]
