@@ -2,7 +2,9 @@ extern crate num_cpus;
 extern crate rand;
 
 use crate::structure::*;
-use crate::summary::loss::{binder_single, binder_single_partitial, vilb_single_kernel};
+use crate::summary::loss::{
+    binder_single, binder_single_partial, vilb_single, vilb_single_kernel, vilb_single_partial,
+};
 use crate::summary::psm::PairwiseSimilarityMatrixView;
 
 use rand::seq::SliceRandom;
@@ -187,20 +189,31 @@ pub unsafe extern "C" fn dahl_partition__summary__minimize_by_salso(
 ) {
     let ni = usize::try_from(n_items).unwrap();
     let psm = PairwiseSimilarityMatrixView::from_ptr(psm_ptr, ni);
-    let (f, g) = match loss {
-        0 => (binder_single_partitial, binder_single),
-        //1 => vilb_single_partital,
+    let max_size = usize::try_from(max_size).unwrap();
+    let candidates = usize::try_from(candidates).unwrap();
+    let max_scans = usize::try_from(max_scans).unwrap();
+    let parallel = parallel != 0;
+    let (minimizer, expected_loss, scans) = match loss {
+        0 => minimize_by_salso(
+            binder_single_partial,
+            binder_single,
+            max_size,
+            &psm,
+            candidates,
+            max_scans,
+            parallel,
+        ),
+        1 => minimize_by_salso(
+            vilb_single_partial,
+            vilb_single,
+            max_size,
+            &psm,
+            candidates,
+            max_scans,
+            parallel,
+        ),
         _ => panic!("Unsupported loss method: {}", loss),
     };
-    let (minimizer, expected_loss, scans) = minimize_by_salso(
-        f,
-        g,
-        usize::try_from(max_size).unwrap(),
-        &psm,
-        usize::try_from(candidates).unwrap(),
-        usize::try_from(max_scans).unwrap(),
-        parallel != 0,
-    );
     let results_slice = slice::from_raw_parts_mut(results_labels_ptr, ni);
     for (i, v) in minimizer.iter().enumerate() {
         results_slice[i] = i32::try_from(*v).unwrap();
