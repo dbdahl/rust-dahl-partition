@@ -84,31 +84,32 @@ pub fn vilb_single_partial(
         .map(|j| unsafe { *permutation.get_unchecked(j) })
         .filter(|jj| unsafe { *partition.get_unchecked(*jj) } == ii_label)
         .collect();
+    if members.len() == 1 {
+        return 0.0;
+    }
     let mut s_with = 0.0;
     let mut s_without = 0.0;
     for kk1 in members.iter() {
+        let kk1 = *kk1;
         let mut s1 = 0.0;
         let mut s2 = 0.0;
         for kk2 in members.iter() {
-            let p = unsafe { *psm.get_unchecked((*kk1, *kk2)) };
+            let kk2 = *kk2;
+            let p = unsafe { *psm.get_unchecked((kk1, kk2)) };
             s1 += p;
-            if *kk2 != ii {
+            if kk2 != ii {
                 s2 += p;
             }
         }
         s_with += s1.log2();
-        if *kk1 != ii {
+        if kk1 != ii {
             s_without += s2.log2();
         }
     }
     let size = members.len() as f64;
     let with = size * size.log2() - 2.0 * s_with;
     let without = (size - 1.0) * (size - 1.0).log2() - 2.0 * s_without;
-    if members.len() > 1 {
-        with - without
-    } else {
-        with
-    }
+    with - without
 }
 
 pub fn vilb_single_kernel(partition: &[usize], psm: &PairwiseSimilarityMatrixView) -> f64 {
