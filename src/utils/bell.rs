@@ -9,7 +9,6 @@ use std::f64;
 /// Computes the natural logarithm of the Bell number.
 ///
 pub fn lbell(n: usize) -> f64 {
-    rprintf(&format!("HR{}", 5));
     let value = bell(n);
     let n_bits = value.bits();
     let threshold = 1022usize;
@@ -25,19 +24,6 @@ pub fn lbell(n: usize) -> f64 {
         value.to_f64().unwrap().log2()
     };
     log2 / f64::consts::LOG2_E
-}
-
-use std::ffi::CString;
-use std::os::raw::c_char;
-extern "C" {
-    fn Rprintf(fmt: *const c_char);
-}
-
-pub fn rprintf(x: &String) {
-    let x2 = CString::new(&x[..]).expect("Invalid string.");
-    unsafe {
-        Rprintf(x2.as_ptr());
-    }
 }
 
 pub fn bell(n: usize) -> BigUint {

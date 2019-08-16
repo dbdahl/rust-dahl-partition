@@ -309,6 +309,26 @@ impl Partition {
         self
     }
 
+    /// Removes that last item from the subset `subset_index` of the partition.  This may or may not
+    /// be the most recently added item.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dahl_partition::structure::*;
+    /// let mut partition = Partition::from("AAABBAACAC".as_bytes());
+    /// assert_eq!(partition.pop(1),Some(4));
+    /// ```
+    pub fn pop(&mut self, subset_index: usize) -> Option<usize> {
+        self.check_subset_index(subset_index);
+        let i_option = self.subsets[subset_index].pop();
+        if let Some(item_index) = i_option {
+            self.labels[item_index] = None;
+            self.n_allocated_items -= 1;
+        }
+        i_option
+    }
+
     /// Transfers item `item_index` to a new empty subset.
     pub fn transfer(&mut self, item_index: usize) -> &mut Partition {
         self.check_item_index(item_index);
@@ -755,6 +775,18 @@ impl Subset {
         } else {
             false
         }
+    }
+
+    fn pop(&mut self) -> Option<usize> {
+        if !self.is_clean {
+            self.clean()
+        }
+        let i_option = self.vector.pop();
+        if let Some(i) = i_option {
+            self.set.remove(&i);
+            self.n_items -= 1;
+        };
+        i_option
     }
 
     fn clean(&mut self) {
