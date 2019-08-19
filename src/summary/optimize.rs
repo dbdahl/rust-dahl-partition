@@ -97,6 +97,36 @@ impl<'a> VarOfInfoLBComputer<'a> {
         }
         partition.add_with_index(i, subset_index);
     }
+
+    pub fn expected_loss(&mut self) -> f64 {
+        let nif = self.psm.n_items() as f64;
+        (self.expected_loss_unnormalized() + Self::expected_loss_constant(self.psm)) / nif
+    }
+
+    pub fn expected_loss_unnormalized(&mut self) -> f64 {
+        self.subsets.iter().fold(0.0, |s, subset| {
+            let nif = subset.cached_units.len() as f64;
+            s + nif * nif.log2()
+                - 2.0
+                    * subset
+                        .cached_units
+                        .iter()
+                        .fold(0.0, |s, cu| s + cu.committed_contribution)
+        })
+    }
+
+    pub fn expected_loss_constant(psm: &PairwiseSimilarityMatrixView) -> f64 {
+        let ni = psm.n_items();
+        let mut s1 = 0.0;
+        for i in 0..ni {
+            let mut s2 = 0.0;
+            for j in 0..ni {
+                s2 += unsafe { psm.get_unchecked((i, j)) };
+            }
+            s1 += s2.log2();
+        }
+        s1
+    }
 }
 
 fn cmp_f64(a: &f64, b: &f64) -> Ordering {
@@ -156,7 +186,7 @@ pub fn minimize_vilb_by_salso(
             vilb.add_with_index(&mut partition, ii, subset_index);
         }
         let n_scans = 0;
-        let value = vilb_single_kernel(&partition.labels()[..], psm);
+        let value = vilb.expected_loss_unnormalized();
         if value < global_minimum {
             global_minimum = value;
             global_best = partition;
@@ -164,14 +194,10 @@ pub fn minimize_vilb_by_salso(
         }
     }
     // Canonicalize the labels
-    (
-        (
-            global_best.canonicalize().labels(),
-            global_minimum,
-            global_n_scans,
-        ),
-        candidates,
-    )
+    global_best.canonicalize();
+    let labels = global_best.labels();
+    let loss = (global_minimum + VarOfInfoLBComputer::expected_loss_constant(psm)) / (ni as f64);
+    ((labels, loss, global_n_scans), candidates)
 }
 
 pub fn minimize_by_salso(
