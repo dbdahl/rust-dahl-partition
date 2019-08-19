@@ -88,9 +88,10 @@ impl<'a> VarOfInfoLBComputer<'a> {
     pub fn add_with_index(&mut self, partition: &mut Partition, i: usize, subset_index: usize) {
         for (index, subset) in self.subsets.iter_mut().enumerate() {
             if index == subset_index {
-                let cu = subset.cached_units.last_mut().unwrap();
-                cu.committed_sum = cu.speculative_sum;
-                cu.committed_contribution = cu.speculative_contribution;
+                for cu in subset.cached_units.iter_mut() {
+                    cu.committed_sum = cu.speculative_sum;
+                    cu.committed_contribution = cu.speculative_contribution;
+                }
             } else {
                 subset.cached_units.pop();
             }
