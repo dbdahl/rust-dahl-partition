@@ -41,6 +41,16 @@ impl<'a> VarOfInfoLBComputer<'a> {
     }
 
     pub fn look_ahead(&mut self, partition: &Partition, i: usize, subset_index: usize) -> f64 {
+        if partition.subsets()[subset_index].n_items() == 0 {
+            self.subsets[subset_index].push(CacheUnit {
+                item: i,
+                committed_sum: 0.0,
+                committed_contribution: 0.0,
+                speculative_sum: 1.0,
+                speculative_contribution: 0.0,
+            });
+            return 0.0;
+        }
         let subset_of_partition = &partition.subsets()[subset_index];
         for cu in self.subsets[subset_index].iter_mut() {
             cu.speculative_sum = cu.committed_sum + self.psm[(cu.item, i)];
@@ -59,11 +69,7 @@ impl<'a> VarOfInfoLBComputer<'a> {
             speculative_contribution: sum.log2(),
         });
         let nif = subset_of_partition.n_items() as f64;
-        let s1 = if nif != 0.0 {
-            (nif + 1.0) * (nif + 1.0).log2() - nif * nif.log2()
-        } else {
-            0.0
-        };
+        let s1 = (nif + 1.0) * (nif + 1.0).log2() - nif * nif.log2();
         let s2 = self.subsets[subset_index].iter().fold(0.0, |s, cu| {
             s + cu.speculative_contribution - cu.committed_contribution
         });
