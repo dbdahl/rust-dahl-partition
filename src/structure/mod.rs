@@ -222,7 +222,7 @@ impl Partition {
         self.subsets.push(Subset::new());
     }
 
-    /// Add a new subset containg `item_index` to the partition.
+    /// Add a new subset containing `item_index` to the partition.
     ///
     /// # Examples
     ///

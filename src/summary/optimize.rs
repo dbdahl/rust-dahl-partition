@@ -9,9 +9,94 @@ use crate::summary::psm::PairwiseSimilarityMatrixView;
 
 use rand::seq::SliceRandom;
 use rand::thread_rng;
+use std::cmp::Ordering;
 use std::convert::TryFrom;
 use std::slice;
 use std::sync::mpsc;
+
+pub struct VarOfInfoLBComputer {
+    a: usize,
+}
+
+impl VarOfInfoLBComputer {
+    pub fn new() -> VarOfInfoLBComputer {
+        VarOfInfoLBComputer { a: 0 }
+    }
+    pub fn look_ahead(
+        &mut self,
+        partition: &mut Partition,
+        _i: usize,
+        _subset_index: usize,
+    ) -> f64 {
+        let mut labels = partition.labels();
+        vilb_single(&labels[..]. &psm)
+    }
+}
+
+fn cmp_f64(a: &f64, b: &f64) -> Ordering {
+    if a.is_nan() {
+        return Ordering::Greater;
+    }
+    if b.is_nan() {
+        return Ordering::Less;
+    }
+    if a < b {
+        return Ordering::Less;
+    } else if a > b {
+        return Ordering::Greater;
+    }
+    return Ordering::Equal;
+}
+
+pub fn minimize_vilb_by_salso(
+    max_size: usize,
+    psm: &PairwiseSimilarityMatrixView,
+    candidates: usize,
+    _max_scans: usize,
+    _parallel: bool,
+) -> ((Vec<usize>, f64, usize), usize) {
+    let ni = psm.n_items();
+    let mut global_minimum = std::f64::INFINITY;
+    let mut global_best = Partition::new(ni);
+    let mut global_n_scans = 0;
+    let mut partition = Partition::new(ni);
+    let mut vilb = VarOfInfoLBComputer::new();
+    let mut permutation: Vec<usize> = (0..ni).collect();
+    let mut rng = thread_rng();
+    for _ in 0..candidates {
+        permutation.shuffle(&mut rng);
+        for i in 0..ni {
+            let ii = unsafe { *permutation.get_unchecked(i) };
+            match partition.subsets().last() {
+                None => partition.new_subset(),
+                Some(last) => {
+                    if !last.is_empty() && partition.n_subsets() < max_size {
+                        partition.new_subset()
+                    }
+                }
+            }
+            let subset_index = (0..partition.n_subsets())
+                .map(|subset_index| vilb.look_ahead(&mut partition, ii, subset_index))
+                .enumerate()
+                .min_by(|a, b| cmp_f64(&a.1, &b.1))
+                .unwrap()
+                .0;
+            partition.add_with_index(ii, subset_index);
+        }
+        let n_scans = 0;
+        let value = vilb_single_kernel(&partition.labels()[..], psm);
+        if value < global_minimum {
+            global_minimum = value;
+            global_best = partition.clone();
+            global_n_scans = n_scans;
+        }
+    }
+    // Canonicalize the labels
+    (
+        (global_best.labels(), global_minimum, global_n_scans),
+        candidates,
+    )
+}
 
 pub fn minimize_by_salso(
     f: fn(&[usize], &[usize], usize, usize, &PairwiseSimilarityMatrixView) -> f64,
