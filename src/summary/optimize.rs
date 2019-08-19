@@ -79,7 +79,9 @@ impl<'a> VarOfInfoLBComputer<'a> {
         let s2 = self.subsets[subset_index]
             .cached_units
             .iter()
-            .fold(0.0, |s, cu| s + cu.speculative_contribution - cu.committed_contribution);
+            .fold(0.0, |s, cu| {
+                s + cu.speculative_contribution - cu.committed_contribution
+            });
         s1 - 2.0 * s2
     }
 
@@ -134,6 +136,7 @@ pub fn minimize_vilb_by_salso(
         let mut vilb = VarOfInfoLBComputer::new(psm);
         let mut partition = Partition::new(ni);
         permutation.shuffle(&mut rng);
+        // Initial allocation
         for i in 0..ni {
             let ii = unsafe { *permutation.get_unchecked(i) };
             match partition.subsets().last() {
@@ -162,7 +165,11 @@ pub fn minimize_vilb_by_salso(
     }
     // Canonicalize the labels
     (
-        (global_best.labels(), global_minimum, global_n_scans),
+        (
+            global_best.canonicalize().labels(),
+            global_minimum,
+            global_n_scans,
+        ),
         candidates,
     )
 }
