@@ -14,22 +14,73 @@ use std::convert::TryFrom;
 use std::slice;
 use std::sync::mpsc;
 
-pub struct VarOfInfoLBComputer {
-    a: usize,
+struct CacheUnit {
+    item: usize,
+    committed_sum: f64,
+    committed_contribution: f64,
+    speculative_sum: f64,
+    speculative_contribution: f64,
 }
 
-impl VarOfInfoLBComputer {
-    pub fn new() -> VarOfInfoLBComputer {
-        VarOfInfoLBComputer { a: 0 }
+pub struct VarOfInfoLBComputer<'a> {
+    subsets: Vec<Vec<CacheUnit>>,
+    psm: &'a PairwiseSimilarityMatrixView<'a>,
+}
+
+impl<'a> VarOfInfoLBComputer<'a> {
+    pub fn new(psm: &'a PairwiseSimilarityMatrixView<'a>) -> VarOfInfoLBComputer<'a> {
+        VarOfInfoLBComputer {
+            subsets: Vec::new(),
+            psm,
+        }
     }
-    pub fn look_ahead(
-        &mut self,
-        partition: &mut Partition,
-        _i: usize,
-        _subset_index: usize,
-    ) -> f64 {
-        let mut labels = partition.labels();
-        vilb_single(&labels[..]. &psm)
+
+    pub fn new_subset(&mut self, partition: &mut Partition) {
+        partition.new_subset();
+        self.subsets.push(Vec::new())
+    }
+
+    pub fn look_ahead(&mut self, partition: &Partition, i: usize, subset_index: usize) -> f64 {
+        let subset_of_partition = &partition.subsets()[subset_index];
+        for cu in self.subsets[subset_index].iter_mut() {
+            cu.speculative_sum = cu.committed_sum + self.psm[(cu.item, i)];
+            cu.speculative_contribution = cu.speculative_sum.log2();
+        }
+        let sum = subset_of_partition
+            .items()
+            .iter()
+            .fold(0.0, |s, j| s + self.psm[(i, *j)])
+            + self.psm[(i, i)];
+        self.subsets[subset_index].push(CacheUnit {
+            item: i,
+            committed_sum: 0.0,
+            committed_contribution: 0.0,
+            speculative_sum: sum,
+            speculative_contribution: sum.log2(),
+        });
+        let nif = subset_of_partition.n_items() as f64;
+        let s1 = if nif != 0.0 {
+            (nif + 1.0) * (nif + 1.0).log2() - nif * nif.log2()
+        } else {
+            0.0
+        };
+        let s2 = self.subsets[subset_index].iter().fold(0.0, |s, cu| {
+            s + cu.speculative_contribution - cu.committed_contribution
+        });
+        s1 - 2.0 * s2
+    }
+
+    pub fn add_with_index(&mut self, partition: &mut Partition, i: usize, subset_index: usize) {
+        for (index, subset) in self.subsets.iter_mut().enumerate() {
+            if index == subset_index {
+                let cu = subset.last_mut().unwrap();
+                cu.committed_sum = cu.speculative_sum;
+                cu.committed_contribution = cu.speculative_contribution;
+            } else {
+                subset.pop();
+            }
+        }
+        partition.add_with_index(i, subset_index);
     }
 }
 
@@ -56,22 +107,27 @@ pub fn minimize_vilb_by_salso(
     _parallel: bool,
 ) -> ((Vec<usize>, f64, usize), usize) {
     let ni = psm.n_items();
+    let max_label = if max_size == 0 {
+        usize::max_value()
+    } else {
+        max_size - 1
+    };
     let mut global_minimum = std::f64::INFINITY;
     let mut global_best = Partition::new(ni);
     let mut global_n_scans = 0;
-    let mut partition = Partition::new(ni);
-    let mut vilb = VarOfInfoLBComputer::new();
     let mut permutation: Vec<usize> = (0..ni).collect();
     let mut rng = thread_rng();
     for _ in 0..candidates {
+        let mut vilb = VarOfInfoLBComputer::new(psm);
+        let mut partition = Partition::new(ni);
         permutation.shuffle(&mut rng);
         for i in 0..ni {
             let ii = unsafe { *permutation.get_unchecked(i) };
             match partition.subsets().last() {
-                None => partition.new_subset(),
+                None => vilb.new_subset(&mut partition),
                 Some(last) => {
-                    if !last.is_empty() && partition.n_subsets() < max_size {
-                        partition.new_subset()
+                    if !last.is_empty() && partition.n_subsets() <= max_label {
+                        vilb.new_subset(&mut partition)
                     }
                 }
             }
@@ -81,13 +137,13 @@ pub fn minimize_vilb_by_salso(
                 .min_by(|a, b| cmp_f64(&a.1, &b.1))
                 .unwrap()
                 .0;
-            partition.add_with_index(ii, subset_index);
+            vilb.add_with_index(&mut partition, ii, subset_index);
         }
         let n_scans = 0;
         let value = vilb_single_kernel(&partition.labels()[..], psm);
         if value < global_minimum {
             global_minimum = value;
-            global_best = partition.clone();
+            global_best = partition;
             global_n_scans = n_scans;
         }
     }
@@ -301,6 +357,7 @@ pub unsafe extern "C" fn dahl_partition__summary__minimize_by_salso(
             max_scans,
             parallel,
         ),
+        2 => minimize_vilb_by_salso(max_size, &psm, candidates, max_scans, parallel),
         _ => panic!("Unsupported loss method: {}", loss),
     };
     let results_slice = slice::from_raw_parts_mut(results_labels_ptr, ni);

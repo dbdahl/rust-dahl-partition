@@ -809,9 +809,9 @@ impl Subset {
     }
 
     /// A reference to the elements of the set.
-    pub fn items(&mut self) -> &Vec<usize> {
+    pub fn items(&self) -> &Vec<usize> {
         if !self.is_clean {
-            self.clean();
+            panic!("Subset is not clean.  Please clean it first.");
         }
         &self.vector
     }
