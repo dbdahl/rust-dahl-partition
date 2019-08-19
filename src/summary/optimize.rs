@@ -22,8 +22,12 @@ struct CacheUnit {
     speculative_contribution: f64,
 }
 
+struct SubsetCalculations {
+    cached_units: Vec<CacheUnit>,
+}
+
 pub struct VarOfInfoLBComputer<'a> {
-    subsets: Vec<Vec<CacheUnit>>,
+    subsets: Vec<SubsetCalculations>,
     psm: &'a PairwiseSimilarityMatrixView<'a>,
 }
 
@@ -37,12 +41,14 @@ impl<'a> VarOfInfoLBComputer<'a> {
 
     pub fn new_subset(&mut self, partition: &mut Partition) {
         partition.new_subset();
-        self.subsets.push(Vec::new())
+        self.subsets.push(SubsetCalculations {
+            cached_units: Vec::new(),
+        })
     }
 
     pub fn look_ahead(&mut self, partition: &Partition, i: usize, subset_index: usize) -> f64 {
         if partition.subsets()[subset_index].n_items() == 0 {
-            self.subsets[subset_index].push(CacheUnit {
+            self.subsets[subset_index].cached_units.push(CacheUnit {
                 item: i,
                 committed_sum: 0.0,
                 committed_contribution: 0.0,
@@ -52,7 +58,7 @@ impl<'a> VarOfInfoLBComputer<'a> {
             return 0.0;
         }
         let subset_of_partition = &partition.subsets()[subset_index];
-        for cu in self.subsets[subset_index].iter_mut() {
+        for cu in self.subsets[subset_index].cached_units.iter_mut() {
             cu.speculative_sum = cu.committed_sum + self.psm[(cu.item, i)];
             cu.speculative_contribution = cu.speculative_sum.log2();
         }
@@ -61,7 +67,7 @@ impl<'a> VarOfInfoLBComputer<'a> {
             .iter()
             .fold(0.0, |s, j| s + self.psm[(i, *j)])
             + self.psm[(i, i)];
-        self.subsets[subset_index].push(CacheUnit {
+        self.subsets[subset_index].cached_units.push(CacheUnit {
             item: i,
             committed_sum: 0.0,
             committed_contribution: 0.0,
@@ -70,20 +76,21 @@ impl<'a> VarOfInfoLBComputer<'a> {
         });
         let nif = subset_of_partition.n_items() as f64;
         let s1 = (nif + 1.0) * (nif + 1.0).log2() - nif * nif.log2();
-        let s2 = self.subsets[subset_index].iter().fold(0.0, |s, cu| {
-            s + cu.speculative_contribution - cu.committed_contribution
-        });
+        let s2 = self.subsets[subset_index]
+            .cached_units
+            .iter()
+            .fold(0.0, |s, cu| s + cu.speculative_contribution - cu.committed_contribution);
         s1 - 2.0 * s2
     }
 
     pub fn add_with_index(&mut self, partition: &mut Partition, i: usize, subset_index: usize) {
         for (index, subset) in self.subsets.iter_mut().enumerate() {
             if index == subset_index {
-                let cu = subset.last_mut().unwrap();
+                let cu = subset.cached_units.last_mut().unwrap();
                 cu.committed_sum = cu.speculative_sum;
                 cu.committed_contribution = cu.speculative_contribution;
             } else {
-                subset.pop();
+                subset.cached_units.pop();
             }
         }
         partition.add_with_index(i, subset_index);
