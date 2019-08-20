@@ -26,4 +26,3 @@ pub unsafe extern "C" fn dahl_partition__utils__enumerate(
         phv.push_slice(&partition[..]);
     }
 }
-

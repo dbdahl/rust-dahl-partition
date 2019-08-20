@@ -105,15 +105,18 @@ impl<'a> VarOfInfoLBComputer<'a> {
     }
 
     pub fn expected_loss_unnormalized(&mut self) -> f64 {
-        self.subsets.iter().fold(0.0, |s, subset| {
-            let nif = subset.cached_units.len() as f64;
-            s + nif * nif.log2()
-                - 2.0
-                    * subset
-                        .cached_units
-                        .iter()
-                        .fold(0.0, |s, cu| s + cu.committed_contribution)
-        })
+        self.subsets
+            .iter()
+            .filter(|subset| subset.cached_units.len() > 0)
+            .fold(0.0, |s, subset| {
+                let nif = subset.cached_units.len() as f64;
+                s + nif * nif.log2()
+                    - 2.0
+                        * subset
+                            .cached_units
+                            .iter()
+                            .fold(0.0, |s, cu| s + cu.committed_contribution)
+            })
     }
 
     pub fn expected_loss_constant(psm: &PairwiseSimilarityMatrixView) -> f64 {
