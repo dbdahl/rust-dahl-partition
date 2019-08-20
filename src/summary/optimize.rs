@@ -85,6 +85,8 @@ impl<'a> BinderComputer<'a> {
 
     pub fn remove(&mut self, partition: &mut Partition, i: usize) -> usize {
         let subset_index = partition.label_of(i).unwrap();
+        partition.remove_with_index(i, subset_index);
+        partition.clean_subset(subset_index);
         self.subsets[subset_index].committed_loss =
             -partition
                 .subsets()
@@ -102,8 +104,7 @@ impl<'a> BinderComputer<'a> {
                             .fold(0.0, |s, j| s + unsafe { *self.psm.get_unchecked((i, *j)) })
                     }
                 });
-        partition.remove_with_index(i, subset_index);
-        partition.clean_subset(subset_index);
+
         subset_index
     }
 
