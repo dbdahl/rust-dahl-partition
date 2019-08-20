@@ -52,7 +52,7 @@ impl<'a> VarOfInfoLBComputer<'a> {
         })
     }
 
-    pub fn look_ahead(&mut self, partition: &Partition, i: usize, subset_index: usize) -> f64 {
+    pub fn speculative_add(&mut self, partition: &Partition, i: usize, subset_index: usize) -> f64 {
         let subset_of_partition = &partition.subsets()[subset_index];
         if subset_of_partition.n_items() == 0 {
             self.subsets[subset_index].cached_units.push(CacheUnit {
@@ -150,9 +150,9 @@ impl<'a> VarOfInfoLBComputer<'a> {
 
     pub fn expected_loss_constant(psm: &PairwiseSimilarityMatrixView) -> f64 {
         let ni = psm.n_items();
-        let mut s1 = 0.0;
+        let mut s1: f64 = 0.0;
         for i in 0..ni {
-            let mut s2 = 0.0;
+            let mut s2: f64 = 0.0;
             for j in 0..ni {
                 s2 += unsafe { psm.get_unchecked((i, j)) };
             }
@@ -164,17 +164,46 @@ impl<'a> VarOfInfoLBComputer<'a> {
 
 fn cmp_f64(a: &f64, b: &f64) -> Ordering {
     if a.is_nan() {
-        return Ordering::Greater;
-    }
-    if b.is_nan() {
-        return Ordering::Less;
-    }
-    if a < b {
-        return Ordering::Less;
+        Ordering::Greater
+    } else if b.is_nan() {
+        Ordering::Less
+    } else if a < b {
+        Ordering::Less
     } else if a > b {
-        return Ordering::Greater;
+        Ordering::Greater
+    } else {
+        Ordering::Equal
     }
-    return Ordering::Equal;
+}
+
+fn ensure_empty_subset(
+    partition: &mut Partition,
+    vilb: &mut VarOfInfoLBComputer,
+    max_label: usize,
+) {
+    match partition.subsets().last() {
+        None => vilb.new_subset(partition),
+        Some(last) => {
+            if !last.is_empty() && partition.n_subsets() <= max_label {
+                vilb.new_subset(partition)
+            }
+        }
+    }
+}
+
+fn micro_optimized_allocation(
+    partition: &mut Partition,
+    vilb: &mut VarOfInfoLBComputer,
+    i: usize,
+) -> usize {
+    let subset_index = (0..partition.n_subsets())
+        .map(|subset_index| vilb.speculative_add(partition, i, subset_index))
+        .enumerate()
+        .min_by(|a, b| cmp_f64(&a.1, &b.1))
+        .unwrap()
+        .0;
+    vilb.add_with_index(partition, i, subset_index);
+    subset_index
 }
 
 pub fn minimize_vilb_by_salso(
@@ -201,45 +230,19 @@ pub fn minimize_vilb_by_salso(
         permutation.shuffle(&mut rng);
         // Initial allocation
         for i in 0..ni {
+            ensure_empty_subset(&mut partition, &mut vilb, max_label);
             let ii = unsafe { *permutation.get_unchecked(i) };
-            match partition.subsets().last() {
-                None => vilb.new_subset(&mut partition),
-                Some(last) => {
-                    if !last.is_empty() && partition.n_subsets() <= max_label {
-                        vilb.new_subset(&mut partition)
-                    }
-                }
-            }
-            let subset_index = (0..partition.n_subsets())
-                .map(|subset_index| vilb.look_ahead(&mut partition, ii, subset_index))
-                .enumerate()
-                .min_by(|a, b| cmp_f64(&a.1, &b.1))
-                .unwrap()
-                .0;
-            vilb.add_with_index(&mut partition, ii, subset_index);
+            micro_optimized_allocation(&mut partition, &mut vilb, ii);
         }
         // Sweetening scans
         let mut n_scans = max_scans;
         for scan in 0..max_scans {
             let mut no_change = true;
             for i in 0..ni {
+                ensure_empty_subset(&mut partition, &mut vilb, max_label);
                 let ii = unsafe { *permutation.get_unchecked(i) };
-                match partition.subsets().last() {
-                    None => vilb.new_subset(&mut partition),
-                    Some(last) => {
-                        if !last.is_empty() && partition.n_subsets() <= max_label {
-                            vilb.new_subset(&mut partition)
-                        }
-                    }
-                }
                 let previous_subset_index = vilb.remove(&mut partition, ii);
-                let subset_index = (0..partition.n_subsets())
-                    .map(|subset_index| vilb.look_ahead(&mut partition, ii, subset_index))
-                    .enumerate()
-                    .min_by(|a, b| cmp_f64(&a.1, &b.1))
-                    .unwrap()
-                    .0;
-                vilb.add_with_index(&mut partition, ii, subset_index);
+                let subset_index = micro_optimized_allocation(&mut partition, &mut vilb, ii);
                 if subset_index != previous_subset_index {
                     no_change = false;
                 };
