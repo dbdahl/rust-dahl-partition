@@ -24,6 +24,8 @@ struct CacheUnit {
 
 struct SubsetCalculations {
     cached_units: Vec<CacheUnit>,
+    committed_loss: f64,
+    speculative_loss: f64,
 }
 
 pub struct VarOfInfoLBComputer<'a> {
@@ -43,11 +45,14 @@ impl<'a> VarOfInfoLBComputer<'a> {
         partition.new_subset();
         self.subsets.push(SubsetCalculations {
             cached_units: Vec::new(),
+            committed_loss: 0.0,
+            speculative_loss: 0.0,
         })
     }
 
     pub fn look_ahead(&mut self, partition: &Partition, i: usize, subset_index: usize) -> f64 {
-        if partition.subsets()[subset_index].n_items() == 0 {
+        let subset_of_partition = &partition.subsets()[subset_index];
+        if subset_of_partition.n_items() == 0 {
             self.subsets[subset_index].cached_units.push(CacheUnit {
                 item: i,
                 committed_sum: 0.0,
@@ -57,16 +62,15 @@ impl<'a> VarOfInfoLBComputer<'a> {
             });
             return 0.0;
         }
-        let subset_of_partition = &partition.subsets()[subset_index];
         for cu in self.subsets[subset_index].cached_units.iter_mut() {
-            cu.speculative_sum = cu.committed_sum + self.psm[(cu.item, i)];
+            cu.speculative_sum = cu.committed_sum + unsafe { self.psm.get_unchecked((cu.item, i)) };
             cu.speculative_contribution = cu.speculative_sum.log2();
         }
         let sum = subset_of_partition
             .items()
             .iter()
-            .fold(0.0, |s, j| s + self.psm[(i, *j)])
-            + self.psm[(i, i)];
+            .fold(0.0, |s, j| s + unsafe { self.psm.get_unchecked((i, *j)) })
+            + 1.0; // Because self.psm[(i, i)] == 1;
         self.subsets[subset_index].cached_units.push(CacheUnit {
             item: i,
             committed_sum: 0.0,
@@ -75,14 +79,13 @@ impl<'a> VarOfInfoLBComputer<'a> {
             speculative_contribution: sum.log2(),
         });
         let nif = subset_of_partition.n_items() as f64;
-        let s1 = (nif + 1.0) * (nif + 1.0).log2() - nif * nif.log2();
+        let s1 = (nif + 1.0) * (nif + 1.0).log2();
         let s2 = self.subsets[subset_index]
             .cached_units
             .iter()
-            .fold(0.0, |s, cu| {
-                s + cu.speculative_contribution - cu.committed_contribution
-            });
-        s1 - 2.0 * s2
+            .fold(0.0, |s, cu| s + cu.speculative_contribution);
+        self.subsets[subset_index].speculative_loss = s1 - 2.0 * s2;
+        self.subsets[subset_index].speculative_loss - self.subsets[subset_index].committed_loss
     }
 
     pub fn add_with_index(&mut self, partition: &mut Partition, i: usize, subset_index: usize) {
@@ -96,6 +99,7 @@ impl<'a> VarOfInfoLBComputer<'a> {
                 subset.cached_units.pop();
             }
         }
+        self.subsets[subset_index].committed_loss = self.subsets[subset_index].speculative_loss;
         partition.add_with_index(i, subset_index);
     }
 
@@ -107,16 +111,7 @@ impl<'a> VarOfInfoLBComputer<'a> {
     pub fn expected_loss_unnormalized(&mut self) -> f64 {
         self.subsets
             .iter()
-            .filter(|subset| subset.cached_units.len() > 0)
-            .fold(0.0, |s, subset| {
-                let nif = subset.cached_units.len() as f64;
-                s + nif * nif.log2()
-                    - 2.0
-                        * subset
-                            .cached_units
-                            .iter()
-                            .fold(0.0, |s, cu| s + cu.committed_contribution)
-            })
+            .fold(0.0, |s, subset| s + subset.committed_loss)
     }
 
     pub fn expected_loss_constant(psm: &PairwiseSimilarityMatrixView) -> f64 {
