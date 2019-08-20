@@ -68,7 +68,7 @@ pub unsafe extern "C" fn dahl_partition__distribution__crp__sample(
     let array: &mut [i32] = slice::from_raw_parts_mut(ptr, np * ni);
     for i in 0..np {
         let p = sample(ni, mass);
-        let labels = p.labels_with_missing();
+        let labels = p.labels();
         for j in 0..ni {
             array[np * j + i] = i32::try_from(labels[j].unwrap()).unwrap();
         }

@@ -14,6 +14,7 @@ use std::convert::TryFrom;
 use std::slice;
 use std::sync::mpsc;
 
+#[derive(Debug)]
 struct CacheUnit {
     item: usize,
     committed_sum: f64,
@@ -22,6 +23,7 @@ struct CacheUnit {
     speculative_contribution: f64,
 }
 
+#[derive(Debug)]
 struct SubsetCalculations {
     cached_units: Vec<CacheUnit>,
     committed_loss: f64,
@@ -103,6 +105,38 @@ impl<'a> VarOfInfoLBComputer<'a> {
         partition.add_with_index(i, subset_index);
     }
 
+    pub fn remove(&mut self, partition: &mut Partition, i: usize) -> usize {
+        let subset_index = partition.label_of(i).unwrap();
+        for cu in self.subsets[subset_index].cached_units.iter_mut() {
+            cu.committed_sum -= unsafe { self.psm.get_unchecked((cu.item, i)) };
+            cu.committed_contribution = cu.committed_sum.log2();
+        }
+        let pos = self.subsets[subset_index]
+            .cached_units
+            .iter()
+            .enumerate()
+            .find(|cu| cu.1.item == i)
+            .unwrap()
+            .0;
+        self.subsets[subset_index].cached_units.swap_remove(pos);
+        self.subsets[subset_index].committed_loss =
+            match partition.subsets()[subset_index].n_items() {
+                0 => 0.0,
+                ni => {
+                    let nif = ni as f64;
+                    nif * nif.log2()
+                        - 2.0
+                            * self.subsets[subset_index]
+                                .cached_units
+                                .iter()
+                                .fold(0.0, |s, cu| s + cu.committed_contribution)
+                }
+            };
+        partition.remove_with_index(i, subset_index);
+        partition.clean_subset(subset_index);
+        subset_index
+    }
+
     pub fn expected_loss(&mut self) -> f64 {
         let nif = self.psm.n_items() as f64;
         (self.expected_loss_unnormalized() + Self::expected_loss_constant(self.psm)) / nif
@@ -147,7 +181,7 @@ pub fn minimize_vilb_by_salso(
     max_size: usize,
     psm: &PairwiseSimilarityMatrixView,
     candidates: usize,
-    _max_scans: usize,
+    max_scans: usize,
     _parallel: bool,
 ) -> ((Vec<usize>, f64, usize), usize) {
     let ni = psm.n_items();
@@ -184,7 +218,37 @@ pub fn minimize_vilb_by_salso(
                 .0;
             vilb.add_with_index(&mut partition, ii, subset_index);
         }
-        let n_scans = 0;
+        // Sweetening scans
+        let mut n_scans = max_scans;
+        for scan in 0..max_scans {
+            let mut no_change = true;
+            for i in 0..ni {
+                let ii = unsafe { *permutation.get_unchecked(i) };
+                match partition.subsets().last() {
+                    None => vilb.new_subset(&mut partition),
+                    Some(last) => {
+                        if !last.is_empty() && partition.n_subsets() <= max_label {
+                            vilb.new_subset(&mut partition)
+                        }
+                    }
+                }
+                let previous_subset_index = vilb.remove(&mut partition, ii);
+                let subset_index = (0..partition.n_subsets())
+                    .map(|subset_index| vilb.look_ahead(&mut partition, ii, subset_index))
+                    .enumerate()
+                    .min_by(|a, b| cmp_f64(&a.1, &b.1))
+                    .unwrap()
+                    .0;
+                vilb.add_with_index(&mut partition, ii, subset_index);
+                if subset_index != previous_subset_index {
+                    no_change = false;
+                };
+            }
+            if no_change {
+                n_scans = scan + 1;
+                break;
+            }
+        }
         let value = vilb.expected_loss_unnormalized();
         if value < global_minimum {
             global_minimum = value;
@@ -194,7 +258,7 @@ pub fn minimize_vilb_by_salso(
     }
     // Canonicalize the labels
     global_best.canonicalize();
-    let labels = global_best.labels();
+    let labels = global_best.labels_via_copying();
     let loss = (global_minimum + VarOfInfoLBComputer::expected_loss_constant(psm)) / (ni as f64);
     ((labels, loss, global_n_scans), candidates)
 }
@@ -321,7 +385,7 @@ pub fn salso_engine(
     }
     // Canonicalize the labels
     (
-        Partition::from(&global_best[..]).labels(),
+        Partition::from(&global_best[..]).labels_via_copying(),
         global_minimum,
         global_n_scans,
     )

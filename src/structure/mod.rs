@@ -189,20 +189,34 @@ impl Partition {
 
     /// A vector of length `n_items` whose elements are subset labels.  Panics if any items are
     /// not allocated.
-    pub fn labels(&self) -> Vec<usize> {
+    pub fn labels_via_copying(&self) -> Vec<usize> {
         self.labels.iter().map(|x| x.unwrap()).collect()
     }
 
     /// A reference to a vector of length `n_items` whose elements are `None` for items that are
     /// not allocated (i.e., missing) and, for items that are allocated, `Some(subset_index)` where `subset_index`
     /// is the index of the subset to which the item is allocated.
-    pub fn labels_with_missing(&self) -> &Vec<Option<usize>> {
+    pub fn labels(&self) -> &Vec<Option<usize>> {
         &self.labels
+    }
+
+    /// Either `None` for an item that is
+    /// not allocated (i.e., missing) and, for an item that is allocated, `Some(subset_index)` where `subset_index`
+    /// is the index of the subset to which the item is allocated.
+    pub fn label_of(&self, item_index: usize) -> Option<usize> {
+        self.check_item_index(item_index);
+        self.labels[item_index]
     }
 
     /// A reference to a vector of length `n_subsets` giving subsets, some of which may be empty.
     pub fn subsets(&self) -> &Vec<Subset> {
         &self.subsets
+    }
+
+    /// A reference to a vector of length `n_subsets` giving subsets, some of which may be empty.
+    pub fn clean_subset(&mut self, subset_index: usize) {
+        self.check_subset_index(subset_index);
+        self.subsets[subset_index].clean();
     }
 
     /// Add a new empty subset to the partition.
@@ -589,9 +603,9 @@ mod tests_partition {
         assert_eq!(p0.to_string(), "0 1 2 2 2 3 0");
         let p1 = Partition::from("ABCAADAABD".as_bytes());
         assert_eq!(p1.to_string(), "0 1 2 0 0 3 0 0 1 3");
-        let p2 = Partition::from(p1.labels_with_missing());
+        let p2 = Partition::from(p1.labels());
         assert_eq!(p1.to_string(), p2.to_string());
-        let p3 = Partition::from(p0.labels_with_missing());
+        let p3 = Partition::from(p0.labels());
         assert_eq!(p0.to_string(), p3.to_string());
     }
 
@@ -963,7 +977,7 @@ impl PartitionsHolder {
     pub fn push_partition(&mut self, partition: &Partition) {
         assert!(!self.by_row, "Pushing requires that by_row = false.");
         assert_eq!(partition.n_items, self.n_items);
-        for j in partition.labels_with_missing() {
+        for j in partition.labels() {
             self.data.push(i32::try_from(j.unwrap()).unwrap())
         }
         self.n_partitions += 1
@@ -1117,7 +1131,7 @@ impl<'a> PartitionsHolderView<'a> {
             self.n_items,
             "Inconsistent number of items."
         );
-        for (j, v) in partition.labels_with_missing().iter().enumerate() {
+        for (j, v) in partition.labels().iter().enumerate() {
             let v = i32::try_from(v.unwrap()).unwrap();
             let o = if self.by_row {
                 self.n_partitions * j + self.index

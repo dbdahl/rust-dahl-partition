@@ -229,14 +229,14 @@ mod tests_loss {
         binder_multiple(samples_view, psm_view, &mut results[..]);
         for i in 0..n_items {
             relative_eq!(
-                binder_single(&samples_view.get(i).labels()[..], psm_view),
+                binder_single(&samples_view.get(i).labels_via_copying()[..], psm_view),
                 results[i]
             );
         }
         vilb_multiple(samples_view, psm_view, &mut results[..]);
         for i in 0..n_items {
             relative_eq!(
-                vilb_single(&samples_view.get(i).labels()[..], psm_view),
+                vilb_single(&samples_view.get(i).labels_via_copying()[..], psm_view),
                 results[i]
             );
         }
