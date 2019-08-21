@@ -2,9 +2,7 @@ extern crate num_cpus;
 extern crate rand;
 
 use crate::structure::*;
-use crate::summary::loss::{
-    binder_single, binder_single_partial, vilb_single, vilb_single_kernel, vilb_single_partial,
-};
+use crate::summary::loss::{binder_single, vilb_single_kernel};
 use crate::summary::psm::PairwiseSimilarityMatrixView;
 
 use rand::seq::SliceRandom;
@@ -127,18 +125,12 @@ fn binder_micro_optimized_allocation(
 }
 
 pub fn minimize_binder_by_salso(
-    max_size: usize,
+    max_label: usize,
     psm: &PairwiseSimilarityMatrixView,
     candidates: usize,
     max_scans: usize,
-    _parallel: bool,
-) -> ((Vec<usize>, f64, usize), usize) {
+) -> (Vec<usize>, f64, usize) {
     let ni = psm.n_items();
-    let max_label = if max_size == 0 {
-        usize::max_value()
-    } else {
-        max_size - 1
-    };
     let mut global_minimum = std::f64::INFINITY;
     let mut global_best = Partition::new(ni);
     let mut global_n_scans = 0;
@@ -184,7 +176,7 @@ pub fn minimize_binder_by_salso(
     global_best.canonicalize();
     let labels = global_best.labels_via_copying();
     let loss = 2.0 * global_minimum + psm.sum_of_triangle();
-    ((labels, loss, global_n_scans), candidates)
+    (labels, loss, global_n_scans)
 }
 
 // Variation of Information Loss
@@ -373,18 +365,12 @@ fn vilb_micro_optimized_allocation(
 }
 
 pub fn minimize_vilb_by_salso(
-    max_size: usize,
+    max_label: usize,
     psm: &PairwiseSimilarityMatrixView,
     candidates: usize,
     max_scans: usize,
-    _parallel: bool,
-) -> ((Vec<usize>, f64, usize), usize) {
+) -> (Vec<usize>, f64, usize) {
     let ni = psm.n_items();
-    let max_label = if max_size == 0 {
-        usize::max_value()
-    } else {
-        max_size - 1
-    };
     let mut global_minimum = std::f64::INFINITY;
     let mut global_best = Partition::new(ni);
     let mut global_n_scans = 0;
@@ -429,12 +415,11 @@ pub fn minimize_vilb_by_salso(
     global_best.canonicalize();
     let labels = global_best.labels_via_copying();
     let loss = (global_minimum + VarOfInfoLBComputer::expected_loss_constant(psm)) / (ni as f64);
-    ((labels, loss, global_n_scans), candidates)
+    (labels, loss, global_n_scans)
 }
 
-pub fn minimize_by_salso_slow(
-    f: fn(&[usize], &[usize], usize, usize, &PairwiseSimilarityMatrixView) -> f64,
-    g: fn(&[usize], &PairwiseSimilarityMatrixView) -> f64,
+pub fn minimize_by_salso(
+    use_vilb: bool,
     max_size: usize,
     psm: &PairwiseSimilarityMatrixView,
     candidates: usize,
@@ -447,10 +432,12 @@ pub fn minimize_by_salso_slow(
         max_size - 1
     };
     if !parallel {
-        (
-            salso_engine_slow(f, g, psm, candidates, max_label, max_scans),
-            candidates,
-        )
+        let result = if use_vilb {
+            minimize_vilb_by_salso(max_label, psm, candidates, max_scans)
+        } else {
+            minimize_binder_by_salso(max_label, psm, candidates, max_scans)
+        };
+        (result, candidates)
     } else {
         let (tx, rx) = mpsc::channel();
         let n_cores = num_cpus::get();
@@ -459,10 +446,12 @@ pub fn minimize_by_salso_slow(
             for _ in 0..n_cores {
                 let tx = mpsc::Sender::clone(&tx);
                 s.spawn(move |_| {
-                    tx.send(salso_engine_slow(
-                        f, g, psm, candidates, max_label, max_scans,
-                    ))
-                    .unwrap();
+                    let result = if use_vilb {
+                        minimize_vilb_by_salso(max_label, psm, candidates, max_scans)
+                    } else {
+                        minimize_binder_by_salso(max_label, psm, candidates, max_scans)
+                    };
+                    tx.send(result).unwrap();
                 });
             }
         })
@@ -476,90 +465,6 @@ pub fn minimize_by_salso_slow(
         }
         (working_best, candidates * n_cores)
     }
-}
-
-pub fn salso_engine_slow(
-    f: fn(&[usize], &[usize], usize, usize, &PairwiseSimilarityMatrixView) -> f64,
-    g: fn(&[usize], &PairwiseSimilarityMatrixView) -> f64,
-    psm: &PairwiseSimilarityMatrixView,
-    candidates: usize,
-    max_label: usize,
-    max_scans: usize,
-) -> (Vec<usize>, f64, usize) {
-    let ni = psm.n_items();
-    let mut global_minimum = std::f64::INFINITY;
-    let mut global_best: Vec<usize> = vec![0; ni];
-    let mut global_n_scans = 0;
-    let mut partition: Vec<usize> = vec![0; ni];
-    let mut permutation: Vec<usize> = (0..ni).collect();
-    let mut rng = thread_rng();
-    for _ in 0..candidates {
-        permutation.shuffle(&mut rng);
-        // Initial allocation
-        partition[unsafe { *permutation.get_unchecked(0) }] = 0;
-        let mut max: usize = 0;
-        for n_allocated in 2..=ni {
-            let ii = unsafe { *permutation.get_unchecked(n_allocated - 1) };
-            let mut minimum = std::f64::INFINITY;
-            let mut index = 0;
-            for l in 0..=(max + 1).min(max_label) {
-                partition[ii] = l;
-                let value = f(
-                    &partition[..],
-                    &permutation[..],
-                    n_allocated - 1,
-                    n_allocated,
-                    psm,
-                );
-                if value < minimum {
-                    minimum = value;
-                    index = l;
-                }
-            }
-            if index > max {
-                max = index;
-            }
-            partition[ii] = index;
-        }
-        // Sweetening scans
-        let mut n_scans = max_scans;
-        for scan in 0..max_scans {
-            let previous = partition.clone();
-            for i in 0..ni {
-                let ii = unsafe { *permutation.get_unchecked(i) };
-                let mut minimum = std::f64::INFINITY;
-                let mut index = 0;
-                for l in 0..=(max + 1).min(max_label) {
-                    partition[ii] = l;
-                    let value = f(&partition[..], &permutation[..], i, ni, psm);
-                    if value < minimum {
-                        minimum = value;
-                        index = l;
-                    }
-                }
-                if index > max {
-                    max = index;
-                }
-                partition[ii] = index;
-            }
-            if partition == previous {
-                n_scans = scan + 1;
-                break;
-            }
-        }
-        let value = g(&partition[..], psm);
-        if value < global_minimum {
-            global_minimum = value;
-            global_best = partition.clone();
-            global_n_scans = n_scans;
-        }
-    }
-    // Canonicalize the labels
-    (
-        Partition::from(&global_best[..]).labels_via_copying(),
-        global_minimum,
-        global_n_scans,
-    )
 }
 
 pub fn minimize_by_enumeration(
@@ -618,29 +523,8 @@ pub unsafe extern "C" fn dahl_partition__summary__minimize_by_salso(
     let candidates = usize::try_from(candidates).unwrap();
     let max_scans = usize::try_from(max_scans).unwrap();
     let parallel = parallel != 0;
-    let ((minimizer, expected_loss, scans), actual_n_candidates) = match loss {
-        0 => minimize_by_salso_slow(
-            binder_single_partial,
-            binder_single,
-            max_size,
-            &psm,
-            candidates,
-            max_scans,
-            parallel,
-        ),
-        1 => minimize_by_salso_slow(
-            vilb_single_partial,
-            vilb_single,
-            max_size,
-            &psm,
-            candidates,
-            max_scans,
-            parallel,
-        ),
-        2 => minimize_binder_by_salso(max_size, &psm, candidates, max_scans, parallel),
-        3 => minimize_vilb_by_salso(max_size, &psm, candidates, max_scans, parallel),
-        _ => panic!("Unsupported loss method: {}", loss),
-    };
+    let ((minimizer, expected_loss, scans), actual_n_candidates) =
+        minimize_by_salso(loss != 0, max_size, &psm, candidates, max_scans, parallel);
     let results_slice = slice::from_raw_parts_mut(results_labels_ptr, ni);
     for (i, v) in minimizer.iter().enumerate() {
         results_slice[i] = i32::try_from(*v).unwrap();

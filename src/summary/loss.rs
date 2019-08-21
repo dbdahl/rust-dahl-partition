@@ -5,29 +5,6 @@ use crate::summary::psm::PairwiseSimilarityMatrixView;
 
 use std::slice;
 
-pub fn binder_single_partial(
-    partition: &[usize],
-    permutation: &[usize],
-    index: usize,
-    n_allocated: usize,
-    psm: &PairwiseSimilarityMatrixView,
-) -> f64 {
-    let j = index;
-    let jj = unsafe { *permutation.get_unchecked(j) };
-    let jj_label = unsafe { *partition.get_unchecked(jj) };
-    let mut sum = 0.0;
-    for i in 0..n_allocated {
-        let ii = unsafe { *permutation.get_unchecked(i) };
-        let p = unsafe { *psm.get_unchecked((ii, jj)) };
-        sum += if unsafe { *partition.get_unchecked(ii) == jj_label } {
-            1.0 - p
-        } else {
-            p
-        }
-    }
-    sum
-}
-
 pub fn binder_single(partition: &[usize], psm: &PairwiseSimilarityMatrixView) -> f64 {
     let ni = partition.len();
     assert_eq!(ni, psm.n_items());
@@ -70,48 +47,6 @@ pub fn binder_multiple(
     }
 }
 
-pub fn vilb_single_partial(
-    partition: &[usize],
-    permutation: &[usize],
-    index: usize,
-    n_allocated: usize,
-    psm: &PairwiseSimilarityMatrixView,
-) -> f64 {
-    let i = index;
-    let ii = unsafe { *permutation.get_unchecked(i) };
-    let ii_label = unsafe { *partition.get_unchecked(ii) };
-    let members: Vec<_> = (0..n_allocated)
-        .map(|j| unsafe { *permutation.get_unchecked(j) })
-        .filter(|jj| unsafe { *partition.get_unchecked(*jj) } == ii_label)
-        .collect();
-    if members.len() == 1 {
-        return 0.0;
-    }
-    let mut s_with = 0.0;
-    let mut s_without = 0.0;
-    for kk1 in members.iter() {
-        let kk1 = *kk1;
-        let mut s1 = 0.0;
-        let mut s2 = 0.0;
-        for kk2 in members.iter() {
-            let kk2 = *kk2;
-            let p = unsafe { *psm.get_unchecked((kk1, kk2)) };
-            s1 += p;
-            if kk2 != ii {
-                s2 += p;
-            }
-        }
-        s_with += s1.log2();
-        if kk1 != ii {
-            s_without += s2.log2();
-        }
-    }
-    let size = members.len() as f64;
-    let with = size * size.log2() - 2.0 * s_with;
-    let without = (size - 1.0) * (size - 1.0).log2() - 2.0 * s_without;
-    with - without
-}
-
 pub fn vilb_single_kernel(partition: &[usize], psm: &PairwiseSimilarityMatrixView) -> f64 {
     let ni = partition.len();
     assert_eq!(ni, psm.n_items());
@@ -128,27 +63,6 @@ pub fn vilb_single_kernel(partition: &[usize], psm: &PairwiseSimilarityMatrixVie
         sum += f64::from(s1).log2() - 2.0 * s3.log2();
     }
     sum
-}
-
-pub fn vilb_single(partition: &[usize], psm: &PairwiseSimilarityMatrixView) -> f64 {
-    let ni = partition.len();
-    assert_eq!(ni, psm.n_items());
-    let mut sum = 0.0;
-    for i in 0..ni {
-        let mut s1 = 0u32;
-        let mut s2 = 0.0;
-        let mut s3 = 0.0;
-        for j in 0..ni {
-            let p = unsafe { *psm.get_unchecked((i, j)) };
-            s2 += p;
-            if unsafe { *partition.get_unchecked(i) == *partition.get_unchecked(j) } {
-                s1 += 1;
-                s3 += p;
-            }
-        }
-        sum += f64::from(s1).log2() + s2.log2() - 2.0 * s3.log2();
-    }
-    sum / (psm.n_items() as f64)
 }
 
 pub fn vilb_multiple(
@@ -222,7 +136,7 @@ mod tests_loss {
         for _ in 0..n_partitions {
             samples.push_partition(&sample(n_items, mass));
         }
-        let mut psm = crate::summary::psm(&samples.view(), true);
+        let mut psm = crate::summary::psm::psm(&samples.view(), true);
         let samples_view = &samples.view();
         let psm_view = &psm.view();
         let mut results = vec![0.0; n_partitions];
@@ -234,10 +148,14 @@ mod tests_loss {
             );
         }
         vilb_multiple(samples_view, psm_view, &mut results[..]);
-        for i in 0..n_items {
+        for i in 1..n_items {
             relative_eq!(
-                vilb_single(&samples_view.get(i).labels_via_copying()[..], psm_view),
-                results[i]
+                vilb_single_kernel(&samples_view.get(i).labels_via_copying()[..], psm_view)
+                    - vilb_single_kernel(
+                        &samples_view.get(i - 1).labels_via_copying()[..],
+                        psm_view
+                    ),
+                results[i] - results[i - 1]
             );
         }
     }
