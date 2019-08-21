@@ -58,23 +58,12 @@ impl<'a> BinderComputer<'a> {
     }
 
     pub fn speculative_add(&mut self, partition: &Partition, i: usize, subset_index: usize) -> f64 {
-        self.subsets[subset_index].speculative_loss =
-            partition
-                .subsets()
-                .iter()
-                .enumerate()
-                .fold(0.0, |s, (index, subset)| {
-                    s + if index == subset_index {
-                        subset.items().iter().fold(0.0, |s, j| {
-                            s + 1.0 - unsafe { *self.psm.get_unchecked((i, *j)) }
-                        })
-                    } else {
-                        subset
-                            .items()
-                            .iter()
-                            .fold(0.0, |s, j| s + unsafe { *self.psm.get_unchecked((i, *j)) })
-                    }
-                });
+        self.subsets[subset_index].speculative_loss = partition.subsets()[subset_index]
+            .items()
+            .iter()
+            .fold(0.0, |s, j| {
+                s + 0.5 - unsafe { *self.psm.get_unchecked((i, *j)) }
+            });
         self.subsets[subset_index].speculative_loss
     }
 
@@ -87,32 +76,20 @@ impl<'a> BinderComputer<'a> {
         let subset_index = partition.label_of(i).unwrap();
         partition.remove_with_index(i, subset_index);
         partition.clean_subset(subset_index);
-        self.subsets[subset_index].committed_loss =
-            -partition
-                .subsets()
-                .iter()
-                .enumerate()
-                .fold(0.0, |s, (index, subset)| {
-                    s + if index == subset_index {
-                        subset.items().iter().fold(0.0, |s, j| {
-                            s + (1.0 - unsafe { *self.psm.get_unchecked((i, *j)) })
-                        })
-                    } else {
-                        subset
-                            .items()
-                            .iter()
-                            .fold(0.0, |s, j| s + unsafe { *self.psm.get_unchecked((i, *j)) })
-                    }
-                });
-
+        self.subsets[subset_index].committed_loss -= partition.subsets()[subset_index]
+            .items()
+            .iter()
+            .fold(0.0, |s, j| {
+                s + 0.5 - unsafe { *self.psm.get_unchecked((i, *j)) }
+            });
         subset_index
     }
 
-    pub fn expected_loss(&mut self) -> f64 {
-        self.expected_loss_unnormalized()
+    pub fn expected_loss(&self) -> f64 {
+        2.0 * self.expected_loss_unnormalized() + self.psm.sum_of_triangle()
     }
 
-    pub fn expected_loss_unnormalized(&mut self) -> f64 {
+    pub fn expected_loss_unnormalized(&self) -> f64 {
         self.subsets
             .iter()
             .fold(0.0, |s, subset| s + subset.committed_loss)
@@ -206,7 +183,7 @@ pub fn minimize_binder_by_salso(
     // Canonicalize the labels
     global_best.canonicalize();
     let labels = global_best.labels_via_copying();
-    let loss = global_minimum;
+    let loss = 2.0 * global_minimum + psm.sum_of_triangle();
     ((labels, loss, global_n_scans), candidates)
 }
 
@@ -340,12 +317,12 @@ impl<'a> VarOfInfoLBComputer<'a> {
         subset_index
     }
 
-    pub fn expected_loss(&mut self) -> f64 {
+    pub fn expected_loss(&self) -> f64 {
         let nif = self.psm.n_items() as f64;
         (self.expected_loss_unnormalized() + Self::expected_loss_constant(self.psm)) / nif
     }
 
-    pub fn expected_loss_unnormalized(&mut self) -> f64 {
+    pub fn expected_loss_unnormalized(&self) -> f64 {
         self.subsets
             .iter()
             .fold(0.0, |s, subset| s + subset.committed_loss)

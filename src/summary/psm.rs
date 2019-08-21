@@ -67,6 +67,16 @@ impl<'a> PairwiseSimilarityMatrixView<'a> {
     pub fn data(&self) -> &[f64] {
         self.data
     }
+
+    pub fn sum_of_triangle(&self) -> f64 {
+        let mut sum = 0.0;
+        for i in 0..self.n_items {
+            for j in 0..i {
+                sum += unsafe { self.get_unchecked((i, j)) };
+            }
+        }
+        sum
+    }
 }
 
 pub fn psm(partitions: &PartitionsHolderView, parallel: bool) -> PairwiseSimilarityMatrix {
