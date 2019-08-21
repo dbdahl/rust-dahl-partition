@@ -127,16 +127,18 @@ fn binder_micro_optimized_allocation(
 pub fn minimize_binder_by_salso(
     max_label: usize,
     psm: &PairwiseSimilarityMatrixView,
-    candidates: usize,
-    max_scans: usize,
-) -> (Vec<usize>, f64, usize) {
+    max_scans: u32,
+    candidates: u32,
+    stop_time: std::time::SystemTime,
+) -> (Vec<usize>, f64, u32, u32) {
     let ni = psm.n_items();
     let mut global_minimum = std::f64::INFINITY;
     let mut global_best = Partition::new(ni);
     let mut global_n_scans = 0;
     let mut permutation: Vec<usize> = (0..ni).collect();
     let mut rng = thread_rng();
-    for _ in 0..candidates {
+    let mut candidates_counter = 0;
+    while candidates_counter < candidates {
         let mut binder = BinderComputer::new(psm);
         let mut partition = Partition::new(ni);
         permutation.shuffle(&mut rng);
@@ -171,12 +173,16 @@ pub fn minimize_binder_by_salso(
             global_best = partition;
             global_n_scans = n_scans;
         }
+        candidates_counter += 1;
+        if std::time::SystemTime::now() > stop_time {
+            break;
+        }
     }
     // Canonicalize the labels
     global_best.canonicalize();
     let labels = global_best.labels_via_copying();
     let loss = 2.0 * global_minimum + psm.sum_of_triangle();
-    (labels, loss, global_n_scans)
+    (labels, loss, global_n_scans, candidates_counter)
 }
 
 // Variation of Information Loss
@@ -367,16 +373,18 @@ fn vilb_micro_optimized_allocation(
 pub fn minimize_vilb_by_salso(
     max_label: usize,
     psm: &PairwiseSimilarityMatrixView,
-    candidates: usize,
-    max_scans: usize,
-) -> (Vec<usize>, f64, usize) {
+    max_scans: u32,
+    candidates: u32,
+    stop_time: std::time::SystemTime,
+) -> (Vec<usize>, f64, u32, u32) {
     let ni = psm.n_items();
     let mut global_minimum = std::f64::INFINITY;
     let mut global_best = Partition::new(ni);
     let mut global_n_scans = 0;
     let mut permutation: Vec<usize> = (0..ni).collect();
     let mut rng = thread_rng();
-    for _ in 0..candidates {
+    let mut candidates_counter = 0;
+    while candidates_counter < candidates {
         let mut vilb = VarOfInfoLBComputer::new(psm);
         let mut partition = Partition::new(ni);
         permutation.shuffle(&mut rng);
@@ -410,46 +418,53 @@ pub fn minimize_vilb_by_salso(
             global_best = partition;
             global_n_scans = n_scans;
         }
+        candidates_counter += 1;
+        if std::time::SystemTime::now() > stop_time {
+            break;
+        }
     }
     // Canonicalize the labels
     global_best.canonicalize();
     let labels = global_best.labels_via_copying();
     let loss = (global_minimum + VarOfInfoLBComputer::expected_loss_constant(psm)) / (ni as f64);
-    (labels, loss, global_n_scans)
+    (labels, loss, global_n_scans, candidates_counter)
 }
 
 pub fn minimize_by_salso(
+    psm: &PairwiseSimilarityMatrixView,
     use_vilb: bool,
     max_size: usize,
-    psm: &PairwiseSimilarityMatrixView,
-    candidates: usize,
-    max_scans: usize,
+    max_scans: u32,
+    candidates: u32,
+    seconds: u64,
+    nanoseconds: u32,
     parallel: bool,
-) -> ((Vec<usize>, f64, usize), usize) {
+) -> (Vec<usize>, f64, u32, u32) {
     let max_label = if max_size == 0 {
         usize::max_value()
     } else {
         max_size - 1
     };
+    let stop_time = std::time::SystemTime::now() + std::time::Duration::new(seconds, nanoseconds);
     if !parallel {
         let result = if use_vilb {
-            minimize_vilb_by_salso(max_label, psm, candidates, max_scans)
+            minimize_vilb_by_salso(max_label, psm, max_scans, candidates, stop_time)
         } else {
-            minimize_binder_by_salso(max_label, psm, candidates, max_scans)
+            minimize_binder_by_salso(max_label, psm, max_scans, candidates, stop_time)
         };
-        (result, candidates)
+        result
     } else {
         let (tx, rx) = mpsc::channel();
-        let n_cores = num_cpus::get();
+        let n_cores = num_cpus::get() as u32;
         let candidates = (candidates + n_cores - 1) / n_cores;
         crossbeam::scope(|s| {
             for _ in 0..n_cores {
                 let tx = mpsc::Sender::clone(&tx);
                 s.spawn(move |_| {
                     let result = if use_vilb {
-                        minimize_vilb_by_salso(max_label, psm, candidates, max_scans)
+                        minimize_vilb_by_salso(max_label, psm, max_scans, candidates, stop_time)
                     } else {
-                        minimize_binder_by_salso(max_label, psm, candidates, max_scans)
+                        minimize_binder_by_salso(max_label, psm, max_scans, candidates, stop_time)
                     };
                     tx.send(result).unwrap();
                 });
@@ -457,13 +472,16 @@ pub fn minimize_by_salso(
         })
         .unwrap();
         std::mem::drop(tx); // Because of the cloning in the loop.
-        let mut working_best = (vec![0usize; psm.n_items()], std::f64::INFINITY, 0);
+        let mut working_best = (vec![0usize; psm.n_items()], std::f64::INFINITY, 0, 0);
+        let mut candidates_counter = 0;
         for candidate in rx {
+            candidates_counter += candidate.3;
             if candidate.1 < working_best.1 {
                 working_best = candidate;
             }
         }
-        (working_best, candidates * n_cores)
+        working_best.3 = candidates_counter;
+        working_best
     }
 }
 
@@ -507,10 +525,11 @@ pub fn minimize_by_enumeration(
 pub unsafe extern "C" fn dahl_partition__summary__minimize_by_salso(
     n_items: i32,
     psm_ptr: *mut f64,
-    candidates: i32,
-    max_scans: i32,
     loss: i32,
     max_size: i32,
+    max_scans: i32,
+    candidates: i32,
+    seconds: f64,
     parallel: i32,
     results_labels_ptr: *mut i32,
     results_expected_loss_ptr: *mut f64,
@@ -520,11 +539,27 @@ pub unsafe extern "C" fn dahl_partition__summary__minimize_by_salso(
     let ni = usize::try_from(n_items).unwrap();
     let psm = PairwiseSimilarityMatrixView::from_ptr(psm_ptr, ni);
     let max_size = usize::try_from(max_size).unwrap();
-    let candidates = usize::try_from(candidates).unwrap();
-    let max_scans = usize::try_from(max_scans).unwrap();
+    let max_scans = u32::try_from(max_scans).unwrap();
+    let candidates = u32::try_from(candidates).unwrap();
+    let (secs, nanos) = if seconds <= 0.0 {
+        (1000 * 365 * 24 * 60 * 60, 0) // 1,000 years
+    } else {
+        (
+            seconds.floor() as u64,
+            ((seconds - seconds.floor()) * 1_000_000_000.0).floor() as u32,
+        )
+    };
     let parallel = parallel != 0;
-    let ((minimizer, expected_loss, scans), actual_n_candidates) =
-        minimize_by_salso(loss != 0, max_size, &psm, candidates, max_scans, parallel);
+    let (minimizer, expected_loss, scans, actual_n_candidates) = minimize_by_salso(
+        &psm,
+        loss != 0,
+        max_size,
+        max_scans,
+        candidates,
+        secs,
+        nanos,
+        parallel,
+    );
     let results_slice = slice::from_raw_parts_mut(results_labels_ptr, ni);
     for (i, v) in minimizer.iter().enumerate() {
         results_slice[i] = i32::try_from(*v).unwrap();
