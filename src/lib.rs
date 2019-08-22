@@ -48,6 +48,8 @@ impl Partition {
         }
     }
 
+    /// Instantiates a partition for `n_items`, with all items allocated to one subset.
+    ///
     pub fn one_subset(n_items: usize) -> Partition {
         let mut subset = Subset::new();
         for i in 0..n_items {
@@ -62,6 +64,8 @@ impl Partition {
         }
     }
 
+    /// Instantiates a partition for `n_items`, with each item allocated to its own subset.
+    ///
     pub fn singleton_subsets(n_items: usize) -> Partition {
         let mut subsets = Vec::with_capacity(n_items);
         let mut labels = Vec::with_capacity(n_items);
@@ -129,6 +133,8 @@ impl Partition {
         }
     }
 
+    /// An iterator over all possible partitions for the specified number of items.
+    ///
     pub fn iter(n_items: usize) -> PartitionIterator {
         PartitionIterator {
             n_items,
@@ -139,6 +145,9 @@ impl Partition {
         }
     }
 
+    /// A vector of iterators, which together go over all possible partitions for the specified
+    /// number of items.  This can be useful in multi-thread situations.
+    ///
     pub fn iter_sharded(n_shards: u32, n_items: usize) -> Vec<PartitionIterator> {
         let mut shards = Vec::with_capacity(n_shards as usize);
         assert!(n_shards > 0);
@@ -619,6 +628,7 @@ mod tests_partition {
     }
 }
 
+#[doc(hidden)]
 pub struct PartitionIterator {
     n_items: usize,
     labels: Vec<usize>,
@@ -910,7 +920,7 @@ mod tests_subset {
     }
 }
 
-/// A data structure holding partitions
+/// A data structure holding partitions.
 ///
 pub struct PartitionsHolder {
     data: Vec<i32>,
@@ -999,6 +1009,7 @@ impl PartitionsHolder {
     }
 }
 
+#[doc(hidden)]
 pub struct PartitionsHolderView<'a> {
     data: &'a mut [i32],
     n_partitions: usize,
@@ -1215,6 +1226,7 @@ mod tests_partitions_holder {
 
 }
 
+#[doc(hidden)]
 #[no_mangle]
 pub unsafe extern "C" fn dahl_partition__enumerated(
     n_partitions: i32,

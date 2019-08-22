@@ -8,8 +8,3 @@ homepage = "https://dahl.byu.edu"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-#crossbeam = "0.7.2"
-#num_cpus = "1.10.1"
-#num-bigint = "0.2.2"
-#num-traits = "0.2.8"
-#approx = "0.3.2"
