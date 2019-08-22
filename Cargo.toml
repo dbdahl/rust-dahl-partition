@@ -1,6 +1,6 @@
 [package]
 name = "dahl-partition"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["David B. Dahl <dahl@stat.byu.edu>"]
 edition = "2018"
 description = "An efficient representation of a set partition."
@@ -8,9 +8,8 @@ homepage = "https://dahl.byu.edu"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-rand = "0.7.0"
-crossbeam = "0.7.2"
-num_cpus = "1.10.1"
-num-bigint = "0.2.2"
-num-traits = "0.2.8"
-approx = "0.3.2"
+#crossbeam = "0.7.2"
+#num_cpus = "1.10.1"
+#num-bigint = "0.2.2"
+#num-traits = "0.2.8"
+#approx = "0.3.2"
