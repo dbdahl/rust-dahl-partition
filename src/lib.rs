@@ -210,11 +210,20 @@ impl Partition {
     }
 
     /// Either `None` for an item that is
-    /// not allocated (i.e., missing) and, for an item that is allocated, `Some(subset_index)` where `subset_index`
+    /// not allocated (i.e., missing) or, for an item that is allocated, `Some(subset_index)` where `subset_index`
     /// is the index of the subset to which the item is allocated.
     pub fn label_of(&self, item_index: usize) -> Option<usize> {
         self.check_item_index(item_index);
         self.labels[item_index]
+    }
+
+    /// Either `None` for an item that is not allocated (i.e., missing) or, for an item that is allocated,
+    /// `Some(&subset)` where `&subset` is a reference to the subset to which the item is allocated.
+    pub fn subset_of(&self, item_index: usize) -> Option<&Subset> {
+        match self.label_of(item_index) {
+            Some(subset_index) => Some(&self.subsets[subset_index]),
+            None => None,
+        }
     }
 
     /// A reference to a vector of length `n_subsets` giving subsets, some of which may be empty.
@@ -1240,4 +1249,3 @@ pub unsafe extern "C" fn dahl_partition__enumerated(
         phv.push_slice(&partition[..]);
     }
 }
-
