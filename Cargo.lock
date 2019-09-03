@@ -2,5 +2,5 @@
 # It is not intended for manual editing.
 [[package]]
 name = "dahl-partition"
-version = "0.3.0"
+version = "0.3.1"
 

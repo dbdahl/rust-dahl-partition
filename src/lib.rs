@@ -449,6 +449,26 @@ impl Partition {
         self
     }
 
+    /// Test whether the partition is in canonical form?
+    pub fn is_canonical(&self) -> bool {
+        let mut n_subsets = 0;
+        for i in 0..self.n_items {
+            match self.label_of(i) {
+                None => return false,
+                Some(label) => {
+                    if label <= n_subsets {
+                        if label == n_subsets {
+                            n_subsets += 1;
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+            }
+        }
+        self.subsets_are_nonempty()
+    }
+
     /// Test whether subsets are exhaustive.
     pub fn subsets_are_exhaustive(&self) -> bool {
         self.n_allocated_items == self.n_items
@@ -741,7 +761,7 @@ pub struct Subset {
 }
 
 impl Subset {
-    fn new() -> Subset {
+    pub fn new() -> Subset {
         Subset {
             n_items: 0,
             set: HashSet::new(),
@@ -771,7 +791,7 @@ impl Subset {
         }
     }
 
-    fn add(&mut self, i: usize) -> bool {
+    pub fn add(&mut self, i: usize) -> bool {
         if self.set.insert(i) {
             self.n_items += 1;
             if self.is_clean {
@@ -795,6 +815,20 @@ impl Subset {
             }
         }
         added
+    }
+
+    pub fn intersection(&self, other: &Subset) -> Subset {
+        let set: HashSet<usize> = self.set.intersection(&other.set).map(|x| *x).collect();
+        Subset {
+            n_items: set.len(),
+            set,
+            vector: Vec::new(),
+            is_clean: false,
+        }
+    }
+
+    pub fn contains(&self, i: usize) -> bool {
+        self.set.contains(&i)
     }
 
     fn remove(&mut self, i: usize) -> bool {
