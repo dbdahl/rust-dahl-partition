@@ -831,6 +831,12 @@ impl Subset {
                         count += 1;
                     };
                 }
+            } else if other.is_clean {
+                for i in other.vector.iter() {
+                    if self.contains(*i) {
+                        count += 1;
+                    };
+                }
             } else {
                 for i in self.set.iter() {
                     if other.contains(*i) {
