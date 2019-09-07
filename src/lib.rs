@@ -997,7 +997,7 @@ mod tests_subset {
 pub struct Permutation(Vec<usize>);
 
 impl Permutation {
-    pub fn new(x: &[usize]) -> Option<Permutation> {
+    pub fn from_slice(x: &[usize]) -> Option<Permutation> {
         let mut y = Vec::from(x);
         y.sort();
         for i in 0..y.len() {
@@ -1006,6 +1006,17 @@ impl Permutation {
             }
         }
         Some(Permutation(Vec::from(x)))
+    }
+
+    pub fn from_vector(x: Vec<usize>) -> Option<Permutation> {
+        let mut y = x.clone();
+        y.sort();
+        for i in 0..y.len() {
+            if y[i] != i {
+                return None;
+            }
+        }
+        Some(Permutation(x))
     }
 
     pub fn natural(n_items: usize) -> Permutation {
