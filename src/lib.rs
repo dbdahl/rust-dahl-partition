@@ -820,6 +820,28 @@ impl Subset {
         added
     }
 
+    pub fn intersection_count(&self, other: &Subset) -> usize {
+        if self.n_items > other.n_items {
+            other.intersection_count(self)
+        } else {
+            let mut count = 0;
+            if self.is_clean {
+                for i in self.vector.iter() {
+                    if other.contains(*i) {
+                        count += 1;
+                    };
+                }
+            } else {
+                for i in self.set.iter() {
+                    if other.contains(*i) {
+                        count += 1;
+                    };
+                }
+            };
+            count
+        }
+    }
+
     pub fn intersection(&self, other: &Subset) -> Subset {
         let set: HashSet<usize> = self.set.intersection(&other.set).map(|x| *x).collect();
         Subset {
