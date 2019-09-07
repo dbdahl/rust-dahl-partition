@@ -1,5 +1,9 @@
 #![allow(dead_code)]
 
+extern crate rand;
+
+use rand::prelude::ThreadRng;
+use rand::seq::SliceRandom;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -25,6 +29,7 @@ pub struct Partition {
     n_allocated_items: usize,
     subsets: Vec<Subset>,
     labels: Vec<Option<usize>>,
+    is_canonical: bool,
 }
 
 impl Partition {
@@ -45,6 +50,7 @@ impl Partition {
             n_allocated_items: 0,
             subsets: Vec::new(),
             labels: vec![None; n_items],
+            is_canonical: true,
         }
     }
 
@@ -61,6 +67,7 @@ impl Partition {
             n_allocated_items: n_items,
             subsets: vec![subset],
             labels,
+            is_canonical: true,
         }
     }
 
@@ -80,6 +87,7 @@ impl Partition {
             n_allocated_items: n_items,
             subsets,
             labels,
+            is_canonical: true,
         }
     }
 
@@ -130,6 +138,7 @@ impl Partition {
             n_allocated_items: n_items,
             subsets,
             labels: new_labels,
+            is_canonical: true,
         }
     }
 
@@ -252,6 +261,7 @@ impl Partition {
     /// ```
     pub fn new_subset(&mut self) {
         self.subsets.push(Subset::new());
+        self.is_canonical = false;
     }
 
     /// Add a new subset containing `item_index` to the partition.
@@ -274,6 +284,7 @@ impl Partition {
         self.n_allocated_items += 1;
         self.subsets.push(Subset::new());
         self.add_engine(item_index, self.subsets.len() - 1);
+        self.is_canonical = false;
         self
     }
 
@@ -295,6 +306,7 @@ impl Partition {
         self.check_subset_index(subset_index);
         self.n_allocated_items += 1;
         self.add_engine(item_index, subset_index);
+        self.is_canonical = false;
         self
     }
 
@@ -316,6 +328,7 @@ impl Partition {
     pub fn remove(&mut self, item_index: usize) -> &mut Partition {
         self.check_item_index(item_index);
         self.remove_engine(item_index, self.check_allocated(item_index));
+        self.is_canonical = false;
         self
     }
 
@@ -338,6 +351,7 @@ impl Partition {
         self.check_item_index(item_index);
         self.check_item_in_subset(item_index, subset_index);
         self.remove_engine(item_index, subset_index);
+        self.is_canonical = false;
         self
     }
 
@@ -358,6 +372,7 @@ impl Partition {
             self.labels[item_index] = None;
             self.n_allocated_items -= 1;
         }
+        self.is_canonical = false;
         i_option
     }
 
@@ -368,6 +383,7 @@ impl Partition {
         self.subsets[subset_index].remove(item_index);
         self.subsets.push(Subset::new());
         self.add_engine(item_index, self.subsets.len() - 1);
+        self.is_canonical = false;
         self
     }
 
@@ -384,6 +400,7 @@ impl Partition {
         self.check_subset_index(new_subset_index);
         self.subsets[old_subset_index].remove(item_index);
         self.add_engine(item_index, new_subset_index);
+        self.is_canonical = false;
         self
     }
 
@@ -403,6 +420,7 @@ impl Partition {
     /// assert_eq!(partition.to_string(), "0 1 _");
     /// ```
     pub fn canonicalize(&mut self) -> &mut Partition {
+        self.is_canonical = true;
         if self.n_allocated_items == 0 {
             return self;
         }
@@ -451,22 +469,7 @@ impl Partition {
 
     /// Test whether the partition is in canonical form?
     pub fn is_canonical(&self) -> bool {
-        let mut n_subsets = 0;
-        for i in 0..self.n_items {
-            match self.label_of(i) {
-                None => return false,
-                Some(label) => {
-                    if label <= n_subsets {
-                        if label == n_subsets {
-                            n_subsets += 1;
-                        }
-                    } else {
-                        return false;
-                    }
-                }
-            }
-        }
-        self.subsets_are_nonempty()
+        self.is_canonical
     }
 
     /// Test whether subsets are exhaustive.
@@ -960,6 +963,36 @@ mod tests_subset {
         assert_eq!(s1, s2);
         let s3 = Subset::from([6, 1, 2, 3].iter());
         assert_ne!(s1, s3);
+    }
+}
+
+pub struct Permutation(Vec<usize>);
+
+impl Permutation {
+    pub fn new(x: &[usize]) -> Option<Permutation> {
+        let mut y = Vec::from(x);
+        y.sort();
+        for i in 0..y.len() {
+            if y[i] != i {
+                return None;
+            }
+        }
+        Some(Permutation(Vec::from(x)))
+    }
+
+    pub fn natural(n_items: usize) -> Permutation {
+        Permutation((0..n_items).collect())
+    }
+
+    pub fn shuffle(&mut self, rng: &mut ThreadRng) {
+        self.0.shuffle(rng)
+    }
+}
+
+impl std::ops::Index<usize> for Permutation {
+    type Output = usize;
+    fn index(&self, i: usize) -> &Self::Output {
+        &self.0[i]
     }
 }
 
