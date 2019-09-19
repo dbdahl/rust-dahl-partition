@@ -413,23 +413,55 @@ impl Partition {
     /// use dahl_partition::*;
     /// let mut partition = Partition::new(3);
     /// partition.add(1);
-    /// assert_eq!(partition.to_string(), "_ 0 _");
+    /// partition.add(2);
     /// partition.add(0);
-    /// assert_eq!(partition.to_string(), "1 0 _");
+    /// assert_eq!(partition.to_string(), "2 0 1");
     /// partition.canonicalize();
-    /// assert_eq!(partition.to_string(), "0 1 _");
+    /// assert_eq!(partition.to_string(), "0 1 2");
     /// ```
-    pub fn canonicalize(&mut self) -> &mut Partition {
-        self.is_canonical = true;
+    ///
+    pub fn canonicalize(&mut self) -> &mut Self {
+        self.canonicalize_by_permutation(None)
+    }
+
+    /// Put partition into canonical form according to a permutation, removing empty subsets and consecutively numbering
+    /// subsets starting at 0 based on the supplied permutation.  If `None` is supplied, the natural permutation is used.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dahl_partition::*;
+    /// use std::fs::canonicalize;
+    /// let mut partition = Partition::new(3);
+    /// partition.add(1);
+    /// partition.add(2);
+    /// partition.add(0);
+    /// assert_eq!(partition.to_string(), "2 0 1");
+    /// partition.canonicalize_by_permutation(Some(&Permutation::from_slice(&[0,2,1]).unwrap()));
+    /// assert_eq!(partition.to_string(), "0 2 1");
+    /// ```
+    ///
+    pub fn canonicalize_by_permutation(&mut self, permutation: Option<&Permutation>) -> &mut Self {
+        self.is_canonical = match permutation {
+            None => true,
+            Some(p) => {
+                assert_eq!(self.n_items, p.len());
+                false
+            }
+        };
         if self.n_allocated_items == 0 {
             return self;
         }
         let mut new_labels = vec![None; self.n_items];
         let mut next_label: usize = 0;
         for i in 0..self.n_items {
-            match new_labels[i] {
+            let ii = match permutation {
+                None => i,
+                Some(p) => p[i],
+            };
+            match new_labels[ii] {
                 Some(_) => (),
-                None => match self.labels[i] {
+                None => match self.labels[ii] {
                     None => (),
                     Some(subset_index) => {
                         let subset = &mut self.subsets[subset_index];
@@ -1025,6 +1057,10 @@ impl Permutation {
 
     pub fn shuffle(&mut self, rng: &mut ThreadRng) {
         self.0.shuffle(rng)
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
     }
 }
 
