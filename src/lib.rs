@@ -781,7 +781,6 @@ mod tests_iterator {
             &[0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 2]
         );
     }
-
 }
 
 /// A data structure representing sets of integers.  The user instantiates subsets through
@@ -1029,7 +1028,7 @@ mod tests_subset {
 pub struct Permutation(Vec<usize>);
 
 impl Permutation {
-    pub fn from_slice(x: &[usize]) -> Option<Permutation> {
+    pub fn from_slice(x: &[usize]) -> Option<Self> {
         let mut y = Vec::from(x);
         y.sort();
         for i in 0..y.len() {
@@ -1037,10 +1036,10 @@ impl Permutation {
                 return None;
             }
         }
-        Some(Permutation(Vec::from(x)))
+        Some(Self(Vec::from(x)))
     }
 
-    pub fn from_vector(x: Vec<usize>) -> Option<Permutation> {
+    pub fn from_vector(x: Vec<usize>) -> Option<Self> {
         let mut y = x.clone();
         y.sort();
         for i in 0..y.len() {
@@ -1048,11 +1047,17 @@ impl Permutation {
                 return None;
             }
         }
-        Some(Permutation(x))
+        Some(Self(x))
     }
 
-    pub fn natural(n_items: usize) -> Permutation {
-        Permutation((0..n_items).collect())
+    pub fn natural(n_items: usize) -> Self {
+        Self((0..n_items).collect())
+    }
+
+    pub fn random(n_items: usize, rng: &mut ThreadRng) -> Self {
+        let mut perm = Self::natural(n_items);
+        perm.shuffle(rng);
+        perm
     }
 
     pub fn shuffle(&mut self, rng: &mut ThreadRng) {
@@ -1374,7 +1379,6 @@ mod tests_partitions_holder {
         assert_eq!(phtv.get(0), Partition::from("ABCD".as_bytes()));
         assert_eq!(phtv.get(2), Partition::from("AABA".as_bytes()));
     }
-
 }
 
 #[doc(hidden)]
