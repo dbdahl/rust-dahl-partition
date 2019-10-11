@@ -211,6 +211,15 @@ impl Partition {
         self.labels.iter().map(|x| x.unwrap()).collect()
     }
 
+    /// Copy subset labels into a slice.  Panics if any items are not allocated or if the slice
+    /// is not the correct length.
+    pub fn labels_into_slice(&self, slice: &mut [usize]) {
+        assert_eq!(self.n_items, slice.len());
+        for (x, y) in slice.iter_mut().zip(self.labels.iter().map(|x| x.unwrap())) {
+            *x = y;
+        }
+    }
+
     /// A reference to a vector of length `n_items` whose elements are `None` for items that are
     /// not allocated (i.e., missing) and, for items that are allocated, `Some(subset_index)` where `subset_index`
     /// is the index of the subset to which the item is allocated.
