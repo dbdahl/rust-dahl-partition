@@ -213,9 +213,12 @@ impl Partition {
 
     /// Copy subset labels into a slice.  Panics if any items are not allocated or if the slice
     /// is not the correct length.
-    pub fn labels_into_slice(&self, slice: &mut [usize]) {
+    pub fn labels_into_slice<T, U>(&self, slice: &mut [T], f: U)
+    where
+        U: Fn(&Option<usize>) -> T,
+    {
         assert_eq!(self.n_items, slice.len());
-        for (x, y) in slice.iter_mut().zip(self.labels.iter().map(|x| x.unwrap())) {
+        for (x, y) in slice.iter_mut().zip(self.labels.iter().map(f)) {
             *x = y;
         }
     }
