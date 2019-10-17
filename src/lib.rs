@@ -159,14 +159,14 @@ impl Partition {
     ///
     pub fn iter_sharded(n_shards: u32, n_items: usize) -> Vec<PartitionIterator> {
         let mut shards = Vec::with_capacity(n_shards as usize);
-        assert!(n_shards > 0);
-        for i in 0..n_shards {
+        let ns = if n_shards == 0 { 1 } else { n_shards };
+        for i in 0..ns {
             let mut iter = PartitionIterator {
                 n_items,
                 labels: vec![0; n_items],
                 max: vec![0; n_items],
                 done: false,
-                period: n_shards,
+                period: ns,
             };
             iter.advance(i);
             shards.push(iter);
@@ -217,7 +217,6 @@ impl Partition {
     where
         U: Fn(&Option<usize>) -> T,
     {
-        assert_eq!(self.n_items, slice.len());
         for (x, y) in slice.iter_mut().zip(self.labels.iter().map(f)) {
             *x = y;
         }
@@ -247,12 +246,10 @@ impl Partition {
         }
     }
 
-    /// A reference to a vector of length `n_subsets` giving subsets, some of which may be empty.
     pub fn subsets(&self) -> &Vec<Subset> {
         &self.subsets
     }
 
-    /// A reference to a vector of length `n_subsets` giving subsets, some of which may be empty.
     pub fn clean_subset(&mut self, subset_index: usize) {
         self.check_subset_index(subset_index);
         self.subsets[subset_index].clean();
@@ -375,9 +372,9 @@ impl Partition {
     /// ```
     /// use dahl_partition::*;
     /// let mut partition = Partition::from("AAABBAACAC".as_bytes());
-    /// assert_eq!(partition.pop(1),Some(4));
+    /// assert_eq!(partition.pop_item(1),Some(4));
     /// ```
-    pub fn pop(&mut self, subset_index: usize) -> Option<usize> {
+    pub fn pop_item(&mut self, subset_index: usize) -> Option<usize> {
         self.check_subset_index(subset_index);
         let i_option = self.subsets[subset_index].pop();
         if let Some(item_index) = i_option {
@@ -386,6 +383,27 @@ impl Partition {
         }
         self.is_canonical = false;
         i_option
+    }
+
+    /// Removes that last subset of the partition if it empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dahl_partition::*;
+    /// let mut partition = Partition::from("AAABBAACAC".as_bytes());
+    /// partition.new_subset();
+    /// assert_ne!(partition.pop_subset(),None);
+    /// ```
+    pub fn pop_subset(&mut self) -> Option<Subset> {
+        if self.subsets.is_empty() {
+            return None;
+        }
+        let subset = self.subsets.last().unwrap();
+        if !subset.is_empty() {
+            return None;
+        }
+        self.subsets.pop()
     }
 
     /// Transfers item `item_index` to a new empty subset.
