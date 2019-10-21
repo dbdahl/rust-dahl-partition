@@ -1443,7 +1443,11 @@ impl SquareMatrix {
         }
     }
 
-    pub fn data(&mut self) -> &mut [f64] {
+    pub fn data(&self) -> &[f64] {
+        &self.data[..]
+    }
+
+    pub fn data_mut(&mut self) -> &mut [f64] {
         &mut self.data[..]
     }
 
@@ -1493,7 +1497,11 @@ impl<'a> SquareMatrixBorrower<'a> {
         self.data.get_unchecked_mut(self.n_items * j + i)
     }
 
-    pub fn data(&mut self) -> &mut [f64] {
+    pub fn data(&self) -> &[f64] {
+        self.data
+    }
+
+    pub fn data_mut(&mut self) -> &mut [f64] {
         self.data
     }
 
