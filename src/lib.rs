@@ -44,8 +44,8 @@ impl Partition {
     /// assert_eq!(partition.n_subsets(), 0);
     /// assert_eq!(partition.to_string(), "_ _ _ _ _ _ _ _ _ _");
     /// ```
-    pub fn new(n_items: usize) -> Partition {
-        Partition {
+    pub fn new(n_items: usize) -> Self {
+        Self {
             n_items,
             n_allocated_items: 0,
             subsets: Vec::new(),
@@ -56,13 +56,13 @@ impl Partition {
 
     /// Instantiates a partition for `n_items`, with all items allocated to one subset.
     ///
-    pub fn one_subset(n_items: usize) -> Partition {
+    pub fn one_subset(n_items: usize) -> Self {
         let mut subset = Subset::new();
         for i in 0..n_items {
             subset.add(i);
         }
         let labels = vec![Some(0); n_items];
-        Partition {
+        Self {
             n_items,
             n_allocated_items: n_items,
             subsets: vec![subset],
@@ -73,7 +73,7 @@ impl Partition {
 
     /// Instantiates a partition for `n_items`, with each item allocated to its own subset.
     ///
-    pub fn singleton_subsets(n_items: usize) -> Partition {
+    pub fn singleton_subsets(n_items: usize) -> Self {
         let mut subsets = Vec::with_capacity(n_items);
         let mut labels = Vec::with_capacity(n_items);
         for i in 0..n_items {
@@ -82,7 +82,7 @@ impl Partition {
             subsets.push(subset);
             labels.push(Some(i));
         }
-        Partition {
+        Self {
             n_items,
             n_allocated_items: n_items,
             subsets,
@@ -113,7 +113,7 @@ impl Partition {
     /// });
     /// assert_eq!(partition1.to_string(), "0 0 0 1 1 0 0 2 0 2");
     /// ```
-    pub fn from<T>(labels: &[T]) -> Partition
+    pub fn from<T>(labels: &[T]) -> Self
     where
         T: Eq + Hash,
     {
@@ -133,7 +133,7 @@ impl Partition {
             subsets[*label].add(i);
             new_labels[i] = Some(*label);
         }
-        Partition {
+        Self {
             n_items,
             n_allocated_items: n_items,
             subsets,
@@ -287,7 +287,7 @@ impl Partition {
     /// partition.canonicalize();
     /// assert_eq!(partition.to_string(), "0 1 _");
     /// ```
-    pub fn add(&mut self, item_index: usize) -> &mut Partition {
+    pub fn add(&mut self, item_index: usize) -> &mut Self {
         self.check_item_index(item_index);
         self.check_not_allocated(item_index);
         self.n_allocated_items += 1;
@@ -309,7 +309,7 @@ impl Partition {
     /// partition.add_with_index(2, 0);
     /// assert_eq!(partition.to_string(), "_ 0 0");
     /// ```
-    pub fn add_with_index(&mut self, item_index: usize, subset_index: usize) -> &mut Partition {
+    pub fn add_with_index(&mut self, item_index: usize, subset_index: usize) -> &mut Self {
         self.check_item_index(item_index);
         self.check_not_allocated(item_index);
         self.check_subset_index(subset_index);
@@ -334,7 +334,7 @@ impl Partition {
     /// partition.canonicalize();
     /// assert_eq!(partition.to_string(), "0 _ 0 _ _ 0 0 1 0 1");
     /// ```
-    pub fn remove(&mut self, item_index: usize) -> &mut Partition {
+    pub fn remove(&mut self, item_index: usize) -> &mut Self {
         self.check_item_index(item_index);
         self.remove_engine(item_index, self.check_allocated(item_index));
         self.is_canonical = false;
@@ -356,7 +356,7 @@ impl Partition {
     /// partition.canonicalize();
     /// assert_eq!(partition.to_string(), "0 _ 0 _ _ 0 0 1 0 1");
     /// ```
-    pub fn remove_with_index(&mut self, item_index: usize, subset_index: usize) -> &mut Partition {
+    pub fn remove_with_index(&mut self, item_index: usize, subset_index: usize) -> &mut Self {
         self.check_item_index(item_index);
         self.check_item_in_subset(item_index, subset_index);
         self.remove_engine(item_index, subset_index);
@@ -407,7 +407,7 @@ impl Partition {
     }
 
     /// Transfers item `item_index` to a new empty subset.
-    pub fn transfer(&mut self, item_index: usize) -> &mut Partition {
+    pub fn transfer(&mut self, item_index: usize) -> &mut Self {
         self.check_item_index(item_index);
         let subset_index = self.check_allocated(item_index);
         self.subsets[subset_index].remove(item_index);
@@ -424,7 +424,7 @@ impl Partition {
         item_index: usize,
         old_subset_index: usize,
         new_subset_index: usize,
-    ) -> &mut Partition {
+    ) -> &mut Self {
         self.check_item_index(item_index);
         self.check_item_in_subset(item_index, old_subset_index);
         self.check_subset_index(new_subset_index);
@@ -1055,57 +1055,6 @@ mod tests_subset {
     }
 }
 
-pub struct Permutation(Vec<usize>);
-
-impl Permutation {
-    pub fn from_slice(x: &[usize]) -> Option<Self> {
-        let mut y = Vec::from(x);
-        y.sort();
-        for i in 0..y.len() {
-            if y[i] != i {
-                return None;
-            }
-        }
-        Some(Self(Vec::from(x)))
-    }
-
-    pub fn from_vector(x: Vec<usize>) -> Option<Self> {
-        let mut y = x.clone();
-        y.sort();
-        for i in 0..y.len() {
-            if y[i] != i {
-                return None;
-            }
-        }
-        Some(Self(x))
-    }
-
-    pub fn natural(n_items: usize) -> Self {
-        Self((0..n_items).collect())
-    }
-
-    pub fn random(n_items: usize, rng: &mut ThreadRng) -> Self {
-        let mut perm = Self::natural(n_items);
-        perm.shuffle(rng);
-        perm
-    }
-
-    pub fn shuffle(&mut self, rng: &mut ThreadRng) {
-        self.0.shuffle(rng)
-    }
-
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-}
-
-impl std::ops::Index<usize> for Permutation {
-    type Output = usize;
-    fn index(&self, i: usize) -> &Self::Output {
-        &self.0[i]
-    }
-}
-
 /// A data structure holding partitions.
 ///
 pub struct PartitionsHolder {
@@ -1185,8 +1134,8 @@ impl PartitionsHolder {
         self.n_partitions += 1
     }
 
-    pub fn view(&mut self) -> PartitionsHolderView {
-        PartitionsHolderView::from_slice(
+    pub fn view(&mut self) -> PartitionsHolderBorrower {
+        PartitionsHolderBorrower::from_slice(
             &mut self.data[..],
             self.n_partitions,
             self.n_items,
@@ -1196,7 +1145,7 @@ impl PartitionsHolder {
 }
 
 #[doc(hidden)]
-pub struct PartitionsHolderView<'a> {
+pub struct PartitionsHolderBorrower<'a> {
     data: &'a mut [i32],
     n_partitions: usize,
     n_items: usize,
@@ -1204,7 +1153,7 @@ pub struct PartitionsHolderView<'a> {
     index: usize,
 }
 
-impl std::ops::Index<(usize, usize)> for PartitionsHolderView<'_> {
+impl std::ops::Index<(usize, usize)> for PartitionsHolderBorrower<'_> {
     type Output = i32;
     fn index(&self, (i, j): (usize, usize)) -> &Self::Output {
         if self.by_row {
@@ -1215,7 +1164,7 @@ impl std::ops::Index<(usize, usize)> for PartitionsHolderView<'_> {
     }
 }
 
-impl std::ops::IndexMut<(usize, usize)> for PartitionsHolderView<'_> {
+impl std::ops::IndexMut<(usize, usize)> for PartitionsHolderBorrower<'_> {
     fn index_mut(&mut self, (i, j): (usize, usize)) -> &mut Self::Output {
         if self.by_row {
             &mut self.data[self.n_partitions * j + i]
@@ -1225,15 +1174,15 @@ impl std::ops::IndexMut<(usize, usize)> for PartitionsHolderView<'_> {
     }
 }
 
-impl<'a> PartitionsHolderView<'a> {
+impl<'a> PartitionsHolderBorrower<'a> {
     pub fn from_slice(
         data: &'a mut [i32],
         n_partitions: usize,
         n_items: usize,
         by_row: bool,
-    ) -> PartitionsHolderView<'a> {
+    ) -> Self {
         assert_eq!(data.len(), n_partitions * n_items);
-        PartitionsHolderView {
+        Self {
             data,
             n_partitions,
             n_items,
@@ -1247,9 +1196,9 @@ impl<'a> PartitionsHolderView<'a> {
         n_partitions: usize,
         n_items: usize,
         by_row: bool,
-    ) -> PartitionsHolderView<'a> {
+    ) -> Self {
         let data = slice::from_raw_parts_mut(data, n_partitions * n_items);
-        PartitionsHolderView {
+        Self {
             data,
             n_partitions,
             n_items,
@@ -1349,7 +1298,7 @@ impl<'a> PartitionsHolderView<'a> {
     }
 }
 
-impl<'a> fmt::Display for PartitionsHolderView<'a> {
+impl<'a> fmt::Display for PartitionsHolderBorrower<'a> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         for i in 0..self.n_partitions {
             let x = self.get(i).to_string();
@@ -1420,8 +1369,137 @@ pub unsafe extern "C" fn dahl_partition__enumerated(
 ) {
     let n_partitions = usize::try_from(n_partitions).unwrap();
     let n_items = usize::try_from(n_items).unwrap();
-    let mut phv = PartitionsHolderView::from_ptr(partitions_ptr, n_partitions, n_items, true);
+    let mut phv = PartitionsHolderBorrower::from_ptr(partitions_ptr, n_partitions, n_items, true);
     for partition in Partition::iter(n_items) {
         phv.push_slice(&partition[..]);
+    }
+}
+
+/// A data structure representation a permutation of integers.
+///
+pub struct Permutation(Vec<usize>);
+
+impl Permutation {
+    pub fn from_slice(x: &[usize]) -> Option<Self> {
+        let mut y = Vec::from(x);
+        y.sort();
+        for i in 0..y.len() {
+            if y[i] != i {
+                return None;
+            }
+        }
+        Some(Self(Vec::from(x)))
+    }
+
+    pub fn from_vector(x: Vec<usize>) -> Option<Self> {
+        let mut y = x.clone();
+        y.sort();
+        for i in 0..y.len() {
+            if y[i] != i {
+                return None;
+            }
+        }
+        Some(Self(x))
+    }
+
+    pub fn natural(n_items: usize) -> Self {
+        Self((0..n_items).collect())
+    }
+
+    pub fn random(n_items: usize, rng: &mut ThreadRng) -> Self {
+        let mut perm = Self::natural(n_items);
+        perm.shuffle(rng);
+        perm
+    }
+
+    pub fn shuffle(&mut self, rng: &mut ThreadRng) {
+        self.0.shuffle(rng)
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl std::ops::Index<usize> for Permutation {
+    type Output = usize;
+    fn index(&self, i: usize) -> &Self::Output {
+        &self.0[i]
+    }
+}
+
+/// A data structure representing a square matrix.
+///
+pub struct SquareMatrix {
+    data: Vec<f64>,
+    n_items: usize,
+}
+
+impl SquareMatrix {
+    pub fn new(n_items: usize) -> Self {
+        Self {
+            data: vec![0.0; n_items * n_items],
+            n_items,
+        }
+    }
+
+    pub fn view(&mut self) -> SquareMatrixBorrower {
+        SquareMatrixBorrower::from_slice(&mut self.data[..], self.n_items)
+    }
+}
+
+pub struct SquareMatrixBorrower<'a> {
+    data: &'a mut [f64],
+    n_items: usize,
+}
+
+impl std::ops::Index<(usize, usize)> for SquareMatrixBorrower<'_> {
+    type Output = f64;
+    fn index(&self, (i, j): (usize, usize)) -> &Self::Output {
+        &self.data[self.n_items * j + i]
+    }
+}
+
+impl std::ops::IndexMut<(usize, usize)> for SquareMatrixBorrower<'_> {
+    fn index_mut(&mut self, (i, j): (usize, usize)) -> &mut Self::Output {
+        &mut self.data[self.n_items * j + i]
+    }
+}
+
+impl<'a> SquareMatrixBorrower<'a> {
+    pub fn from_slice(data: &'a mut [f64], n_items: usize) -> Self {
+        assert_eq!(data.len(), n_items * n_items);
+        Self { data, n_items }
+    }
+
+    pub unsafe fn from_ptr(data: *mut f64, n_items: usize) -> Self {
+        let data = slice::from_raw_parts_mut(data, n_items * n_items);
+        Self { data, n_items }
+    }
+
+    pub fn n_items(&self) -> usize {
+        self.n_items
+    }
+
+    pub unsafe fn get_unchecked(&self, (i, j): (usize, usize)) -> &f64 {
+        self.data.get_unchecked(self.n_items * j + i)
+    }
+
+    pub unsafe fn get_unchecked_mut(&mut self, (i, j): (usize, usize)) -> &mut f64 {
+        self.data.get_unchecked_mut(self.n_items * j + i)
+    }
+
+    pub fn data(&self) -> &[f64] {
+        self.data
+    }
+
+    pub fn sum_of_triangle(&self) -> f64 {
+        let mut sum = 0.0;
+        for i in 0..self.n_items {
+            for j in 0..i {
+                sum += unsafe { self.get_unchecked((i, j)) };
+            }
+        }
+        sum
     }
 }
