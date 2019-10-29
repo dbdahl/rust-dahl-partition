@@ -1454,6 +1454,10 @@ impl SquareMatrix {
     pub fn view(&mut self) -> SquareMatrixBorrower {
         SquareMatrixBorrower::from_slice(&mut self.data[..], self.n_items)
     }
+
+    pub fn n_items(&self) -> usize {
+        self.n_items
+    }
 }
 
 pub struct SquareMatrixBorrower<'a> {
