@@ -341,6 +341,40 @@ impl Partition {
         self
     }
 
+    /// Remove item `item_index` from the partition and, if this creates an empty subset, relabel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dahl_partition::*;
+    /// let mut partition = Partition::from("AAABBAACAC".as_bytes());
+    /// partition.remove_and_relabel(1);
+    /// partition.remove_and_relabel(4);
+    /// partition.remove_and_relabel(3);
+    /// assert_eq!(partition.to_string(), "0 _ 0 _ _ 0 0 1 0 1");
+    /// ```
+    pub fn remove_and_relabel<T>(&mut self, item_index: usize, mut callback: T) -> &mut Self
+    where
+        T: FnMut(usize, usize),
+    {
+        self.check_item_index(item_index);
+        let subset_index = self.check_allocated(item_index);
+        self.remove_engine(item_index, subset_index);
+        if self.subsets[subset_index].is_empty() {
+            let moved_subset_index = self.subsets.len() - 1;
+            if moved_subset_index != subset_index {
+                self.clean_subset(moved_subset_index);
+                for i in self.subsets[moved_subset_index].items() {
+                    self.labels[*i] = Some(subset_index);
+                }
+            }
+            callback(subset_index, moved_subset_index);
+            self.subsets.swap_remove(subset_index);
+        }
+        self.is_canonical = false;
+        self
+    }
+
     /// Remove item `item_index` from the subset `subset_index` of the partition.
     ///
     /// # Examples
