@@ -2,8 +2,8 @@
 
 extern crate rand;
 
-use rand::prelude::ThreadRng;
 use rand::seq::SliceRandom;
+use rand::Rng;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -348,9 +348,9 @@ impl Partition {
     /// ```
     /// use dahl_partition::*;
     /// let mut partition = Partition::from("AAABBAACAC".as_bytes());
-    /// partition.remove_and_relabel(1);
-    /// partition.remove_and_relabel(4);
-    /// partition.remove_and_relabel(3);
+    /// partition.remove_and_relabel(1, |x,y| {});
+    /// partition.remove_and_relabel(4, |x,y| {});
+    /// partition.remove_and_relabel(3, |x,y| {});
     /// assert_eq!(partition.to_string(), "0 _ 0 _ _ 0 0 1 0 1");
     /// ```
     pub fn remove_and_relabel<T>(&mut self, item_index: usize, mut callback: T) -> &mut Self
@@ -1440,13 +1440,13 @@ impl Permutation {
         Self((0..n_items).collect())
     }
 
-    pub fn random(n_items: usize, rng: &mut ThreadRng) -> Self {
+    pub fn random<T: Rng>(n_items: usize, rng: &mut T) -> Self {
         let mut perm = Self::natural(n_items);
         perm.shuffle(rng);
         perm
     }
 
-    pub fn shuffle(&mut self, rng: &mut ThreadRng) {
+    pub fn shuffle<T: Rng>(&mut self, rng: &mut T) {
         self.0.shuffle(rng)
     }
 
