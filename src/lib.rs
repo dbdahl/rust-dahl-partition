@@ -1453,6 +1453,10 @@ impl Permutation {
     pub fn len(&self) -> usize {
         self.0.len()
     }
+
+    pub fn slice_until(&self, end: usize) -> &[usize] {
+        &self.0[..end]
+    }
 }
 
 impl std::ops::Index<usize> for Permutation {
@@ -1470,11 +1474,30 @@ pub struct SquareMatrix {
 }
 
 impl SquareMatrix {
-    pub fn new(n_items: usize) -> Self {
+    pub fn zeros(n_items: usize) -> Self {
         Self {
             data: vec![0.0; n_items * n_items],
             n_items,
         }
+    }
+
+    pub fn ones(n_items: usize) -> Self {
+        Self {
+            data: vec![1.0; n_items * n_items],
+            n_items,
+        }
+    }
+
+    pub fn identity(n_items: usize) -> Self {
+        let ni1 = n_items + 1;
+        let n2 = n_items * n_items;
+        let mut data = vec![0.0; n2];
+        let mut i = 0;
+        while i < n2 {
+            data[i] = 1.0;
+            i += ni1
+        }
+        Self { data, n_items }
     }
 
     pub fn data(&self) -> &[f64] {
@@ -1549,6 +1572,14 @@ impl<'a> SquareMatrixBorrower<'a> {
             for j in 0..i {
                 sum += unsafe { self.get_unchecked((i, j)) };
             }
+        }
+        sum
+    }
+
+    pub fn sum_of_row_subset(&self, row: usize, columns: &[usize]) -> f64 {
+        let mut sum = 0.0;
+        for j in columns {
+            sum += unsafe { self.get_unchecked((row, *j)) };
         }
         sum
     }
