@@ -29,7 +29,6 @@ pub struct Partition {
     n_allocated_items: usize,
     subsets: Vec<Subset>,
     labels: Vec<Option<usize>>,
-    is_canonical: bool,
 }
 
 impl Partition {
@@ -50,7 +49,6 @@ impl Partition {
             n_allocated_items: 0,
             subsets: Vec::new(),
             labels: vec![None; n_items],
-            is_canonical: true,
         }
     }
 
@@ -67,7 +65,6 @@ impl Partition {
             n_allocated_items: n_items,
             subsets: vec![subset],
             labels,
-            is_canonical: true,
         }
     }
 
@@ -87,7 +84,6 @@ impl Partition {
             n_allocated_items: n_items,
             subsets,
             labels,
-            is_canonical: true,
         }
     }
 
@@ -138,7 +134,6 @@ impl Partition {
             n_allocated_items: n_items,
             subsets,
             labels: new_labels,
-            is_canonical: true,
         }
     }
 
@@ -270,7 +265,6 @@ impl Partition {
     /// ```
     pub fn new_subset(&mut self) {
         self.subsets.push(Subset::new());
-        self.is_canonical = false;
     }
 
     /// Add a new subset containing `item_index` to the partition.
@@ -293,7 +287,6 @@ impl Partition {
         self.n_allocated_items += 1;
         self.subsets.push(Subset::new());
         self.add_engine(item_index, self.subsets.len() - 1);
-        self.is_canonical = false;
         self
     }
 
@@ -315,7 +308,6 @@ impl Partition {
         self.check_subset_index(subset_index);
         self.n_allocated_items += 1;
         self.add_engine(item_index, subset_index);
-        self.is_canonical = false;
         self
     }
 
@@ -337,7 +329,6 @@ impl Partition {
     pub fn remove(&mut self, item_index: usize) -> &mut Self {
         self.check_item_index(item_index);
         self.remove_engine(item_index, self.check_allocated(item_index));
-        self.is_canonical = false;
         self
     }
 
@@ -371,7 +362,6 @@ impl Partition {
             callback(subset_index, moved_subset_index);
             self.subsets.swap_remove(subset_index);
         }
-        self.is_canonical = false;
         self
     }
 
@@ -394,7 +384,6 @@ impl Partition {
         self.check_item_index(item_index);
         self.check_item_in_subset(item_index, subset_index);
         self.remove_engine(item_index, subset_index);
-        self.is_canonical = false;
         self
     }
 
@@ -415,7 +404,6 @@ impl Partition {
             self.labels[item_index] = None;
             self.n_allocated_items -= 1;
         }
-        self.is_canonical = false;
         i_option
     }
 
@@ -447,7 +435,6 @@ impl Partition {
         self.subsets[subset_index].remove(item_index);
         self.subsets.push(Subset::new());
         self.add_engine(item_index, self.subsets.len() - 1);
-        self.is_canonical = false;
         self
     }
 
@@ -464,7 +451,6 @@ impl Partition {
         self.check_subset_index(new_subset_index);
         self.subsets[old_subset_index].remove(item_index);
         self.add_engine(item_index, new_subset_index);
-        self.is_canonical = false;
         self
     }
 
@@ -506,12 +492,8 @@ impl Partition {
     /// ```
     ///
     pub fn canonicalize_by_permutation(&mut self, permutation: Option<&Permutation>) -> &mut Self {
-        self.is_canonical = match permutation {
-            None => true,
-            Some(p) => {
-                assert_eq!(self.n_items, p.len());
-                false
-            }
+        if let Some(p) = permutation {
+            assert_eq!(self.n_items, p.len());
         };
         if self.n_allocated_items == 0 {
             return self;
@@ -561,11 +543,6 @@ impl Partition {
         }
         self.labels = new_labels;
         self
-    }
-
-    /// Test whether the partition is in canonical form?
-    pub fn is_canonical(&self) -> bool {
-        self.is_canonical
     }
 
     /// Test whether subsets are exhaustive.
