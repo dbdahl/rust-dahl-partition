@@ -339,12 +339,12 @@ impl Partition {
     /// ```
     /// use dahl_partition::*;
     /// let mut partition = Partition::from("AAABBAACAC".as_bytes());
-    /// partition.remove_and_relabel(1, |x,y| {});
-    /// partition.remove_and_relabel(4, |x,y| {});
-    /// partition.remove_and_relabel(3, |x,y| {});
+    /// partition.remove_clean_and_relabel(1, |x,y| {});
+    /// partition.remove_clean_and_relabel(4, |x,y| {});
+    /// partition.remove_clean_and_relabel(3, |x,y| {});
     /// assert_eq!(partition.to_string(), "0 _ 0 _ _ 0 0 1 0 1");
     /// ```
-    pub fn remove_and_relabel<T>(&mut self, item_index: usize, mut callback: T) -> &mut Self
+    pub fn remove_clean_and_relabel<T>(&mut self, item_index: usize, mut callback: T) -> &mut Self
     where
         T: FnMut(usize, usize),
     {
@@ -361,6 +361,8 @@ impl Partition {
             }
             callback(subset_index, moved_subset_index);
             self.subsets.swap_remove(subset_index);
+        } else {
+            self.subsets[subset_index].clean();
         }
         self
     }
