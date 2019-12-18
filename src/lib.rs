@@ -354,12 +354,12 @@ impl Partition {
         if self.subsets[subset_index].is_empty() {
             let moved_subset_index = self.subsets.len() - 1;
             if moved_subset_index != subset_index {
-                self.clean_subset(moved_subset_index);
                 for i in self.subsets[moved_subset_index].items() {
                     self.labels[*i] = Some(subset_index);
                 }
             }
             callback(subset_index, moved_subset_index);
+            self.clean_subset(subset_index);
             self.subsets.swap_remove(subset_index);
         } else {
             self.subsets[subset_index].clean();
