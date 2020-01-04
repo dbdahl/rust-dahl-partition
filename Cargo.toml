@@ -1,6 +1,6 @@
 [package]
 name = "dahl-partition"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["David B. Dahl <dahl@stat.byu.edu>"]
 edition = "2018"
 description = "An efficient representation of a set partition."
