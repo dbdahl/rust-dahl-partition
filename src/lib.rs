@@ -241,6 +241,15 @@ impl Partition {
         }
     }
 
+    /// Returns `true` if and only if both items are allocated (i.e., not missing) and are allocated
+    /// to the same subset.
+    pub fn paired(&self, item1_index: usize, item2_index: usize) -> bool {
+        self.check_item_index(item1_index);
+        self.check_item_index(item2_index);
+        let l1 = self.labels[item1_index];
+        l1.is_some() && l1 == self.labels[item2_index]
+    }
+
     pub fn subsets(&self) -> &Vec<Subset> {
         &self.subsets
     }
