@@ -1272,6 +1272,14 @@ impl<'a> PartitionsHolderBorrower<'a> {
         }
     }
 
+    pub fn get_all(&self) -> Vec<Partition> {
+        let mut x = Vec::with_capacity(self.n_partitions);
+        for k in 0..self.n_partitions {
+            x.push(self.get(k))
+        }
+        x
+    }
+
     pub fn push_slice(&mut self, partition: &[usize]) {
         assert_eq!(
             partition.len(),
