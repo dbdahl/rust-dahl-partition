@@ -1566,7 +1566,7 @@ impl<'a> SquareMatrixBorrower<'a> {
         let mut sum = 0.0;
         for i in 0..self.n_items {
             for j in 0..i {
-                sum += unsafe { self.get_unchecked((i, j)) };
+                sum += unsafe { *self.get_unchecked((i, j)) };
             }
         }
         sum
@@ -1575,7 +1575,7 @@ impl<'a> SquareMatrixBorrower<'a> {
     pub fn sum_of_row_subset(&self, row: usize, columns: &[usize]) -> f64 {
         let mut sum = 0.0;
         for j in columns {
-            sum += unsafe { self.get_unchecked((row, *j)) };
+            sum += unsafe { *self.get_unchecked((row, *j)) };
         }
         sum
     }
