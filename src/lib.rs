@@ -1407,6 +1407,7 @@ pub unsafe extern "C" fn dahl_partition__enumerated(
 
 /// A data structure representation a permutation of integers.
 ///
+#[derive(Debug)]
 pub struct Permutation(Vec<usize>);
 
 impl Permutation {
