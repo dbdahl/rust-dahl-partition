@@ -1,6 +1,6 @@
 [package]
 name = "dahl-partition"
-version = "0.5.1"
+version = "0.5.2"
 authors = ["David B. Dahl <dahl@stat.byu.edu>"]
 edition = "2018"
 description = "An efficient representation of a set partition."
@@ -8,4 +8,4 @@ homepage = "https://dahl.byu.edu"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-rand = "0.7.3"
+rand = "0.8.3"
