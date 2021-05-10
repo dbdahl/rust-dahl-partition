@@ -235,10 +235,8 @@ impl Partition {
     /// Either `None` for an item that is not allocated (i.e., missing) or, for an item that is allocated,
     /// `Some(&subset)` where `&subset` is a reference to the subset to which the item is allocated.
     pub fn subset_of(&self, item_index: usize) -> Option<&Subset> {
-        match self.label_of(item_index) {
-            Some(subset_index) => Some(&self.subsets[subset_index]),
-            None => None,
-        }
+        self.label_of(item_index)
+            .map(|subset_index| &self.subsets[subset_index])
     }
 
     /// Returns `true` if and only if both items are allocated (i.e., not missing) and are allocated
@@ -539,17 +537,15 @@ impl Partition {
                 } else {
                     Ordering::Greater
                 }
+            } else if y.is_empty() {
+                Ordering::Less
             } else {
-                if y.is_empty() {
-                    Ordering::Less
-                } else {
-                    new_labels[x.vector[0]]
-                        .unwrap()
-                        .cmp(&new_labels[y.vector[0]].unwrap())
-                }
+                new_labels[x.vector[0]]
+                    .unwrap()
+                    .cmp(&new_labels[y.vector[0]].unwrap())
             }
         });
-        while self.subsets.len() > 0 && self.subsets.last().unwrap().is_empty() {
+        while !self.subsets.is_empty() && self.subsets.last().unwrap().is_empty() {
             self.subsets.pop();
         }
         self.labels = new_labels;
@@ -579,37 +575,33 @@ impl Partition {
 
     fn check_item_index(&self, item_index: usize) {
         if item_index >= self.n_items {
-            panic!(format!(
+            panic!(
                 "Attempt to allocate item {} when only {} are available.",
                 item_index, self.n_items
-            ));
+            );
         };
     }
 
     fn check_subset_index(&self, subset_index: usize) {
         if subset_index >= self.n_subsets() {
-            panic!(format!(
+            panic!(
                 "Attempt to allocate to subset {} when only {} are available.",
                 subset_index,
                 self.n_subsets()
-            ));
+            );
         };
     }
 
     fn check_allocated(&self, item_index: usize) -> usize {
         match self.labels[item_index] {
             Some(subset_index) => subset_index,
-            None => panic!(format!("Item {} is not allocated.", item_index)),
+            None => panic!("Item {} is not allocated.", item_index),
         }
     }
 
     fn check_not_allocated(&self, item_index: usize) {
-        match self.labels[item_index] {
-            Some(j) => panic!(format!(
-                "Item {} is already allocated to subset {}.",
-                item_index, j
-            )),
-            None => (),
+        if let Some(j) = self.labels[item_index] {
+            panic!("Item {} is already allocated to subset {}.", item_index, j)
         };
     }
 
@@ -617,16 +609,10 @@ impl Partition {
         match self.labels[item_index] {
             Some(j) => {
                 if j != subset_index {
-                    panic!(format!(
-                        "Item {} is already allocated to subset {}.",
-                        item_index, j
-                    ));
+                    panic!("Item {} is already allocated to subset {}.", item_index, j);
                 };
             }
-            None => panic!(format!(
-                "Item {} is not allocated to any subset.",
-                item_index
-            )),
+            None => panic!("Item {} is not allocated to any subset.", item_index),
         };
     }
 }
@@ -932,7 +918,7 @@ impl Subset {
     }
 
     pub fn intersection(&self, other: &Subset) -> Subset {
-        let set: HashSet<usize> = self.set.intersection(&other.set).map(|x| *x).collect();
+        let set: HashSet<usize> = self.set.intersection(&other.set).copied().collect();
         Subset {
             n_items: set.len(),
             set,
@@ -1023,6 +1009,12 @@ impl fmt::Display for Subset {
         }
         fmt.write_str("}")?;
         Ok(())
+    }
+}
+
+impl Default for Subset {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -1213,6 +1205,9 @@ impl<'a> PartitionsHolderBorrower<'a> {
         }
     }
 
+    /// # Safety
+    ///
+    /// Added for FFI.
     pub unsafe fn from_ptr(
         data: *mut i32,
         n_partitions: usize,
@@ -1244,6 +1239,9 @@ impl<'a> PartitionsHolderBorrower<'a> {
         self.data
     }
 
+    /// # Safety
+    ///
+    /// You're on your own with the indices.
     pub unsafe fn get_unchecked(&self, (i, j): (usize, usize)) -> &i32 {
         if self.by_row {
             self.data.get_unchecked(self.n_partitions * j + i)
@@ -1252,6 +1250,9 @@ impl<'a> PartitionsHolderBorrower<'a> {
         }
     }
 
+    /// # Safety
+    ///
+    /// You're on your own with the indices.
     pub unsafe fn get_unchecked_mut(&mut self, (i, j): (usize, usize)) -> &mut i32 {
         if self.by_row {
             self.data.get_unchecked_mut(self.n_partitions * j + i)
@@ -1303,10 +1304,9 @@ impl<'a> PartitionsHolderBorrower<'a> {
     pub fn push_partition(&mut self, partition: &Partition) {
         assert!(
             self.index < self.n_partitions,
-            format!(
-                "The holder has capacity {} so cannot push with index {}.",
-                self.n_partitions, self.index
-            )
+            "The holder has capacity {} so cannot push with index {}.",
+            self.n_partitions,
+            self.index
         );
         assert_eq!(
             partition.n_items(),
@@ -1413,9 +1413,9 @@ pub struct Permutation(Vec<usize>);
 impl Permutation {
     pub fn from_slice(x: &[usize]) -> Option<Self> {
         let mut y = Vec::from(x);
-        y.sort();
-        for i in 0..y.len() {
-            if y[i] != i {
+        y.sort_unstable();
+        for (i, j) in y.into_iter().enumerate() {
+            if i != j {
                 return None;
             }
         }
@@ -1424,9 +1424,9 @@ impl Permutation {
 
     pub fn from_vector(x: Vec<usize>) -> Option<Self> {
         let mut y = x.clone();
-        y.sort();
-        for i in 0..y.len() {
-            if y[i] != i {
+        y.sort_unstable();
+        for (i, j) in y.into_iter().enumerate() {
+            if i != j {
                 return None;
             }
         }
@@ -1449,6 +1449,10 @@ impl Permutation {
 
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 
     pub fn slice_until(&self, end: usize) -> &[usize] {
@@ -1538,6 +1542,9 @@ impl<'a> SquareMatrixBorrower<'a> {
         Self { data, n_items }
     }
 
+    /// # Safety
+    ///
+    /// Added for FFI.
     pub unsafe fn from_ptr(data: *mut f64, n_items: usize) -> Self {
         let data = slice::from_raw_parts_mut(data, n_items * n_items);
         Self { data, n_items }
@@ -1547,10 +1554,16 @@ impl<'a> SquareMatrixBorrower<'a> {
         self.n_items
     }
 
+    /// # Safety
+    ///
+    /// You're on your own with the indices.
     pub unsafe fn get_unchecked(&self, (i, j): (usize, usize)) -> &f64 {
         self.data.get_unchecked(self.n_items * j + i)
     }
 
+    /// # Safety
+    ///
+    /// You're on your own with the indices.
     pub unsafe fn get_unchecked_mut(&mut self, (i, j): (usize, usize)) -> &mut f64 {
         self.data.get_unchecked_mut(self.n_items * j + i)
     }
