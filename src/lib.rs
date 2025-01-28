@@ -662,7 +662,7 @@ mod tests_partition {
             p.add_with_index(*i, 0);
         }
         assert_eq!(p.to_string(), "_ _ 0 0 0 0");
-        assert_eq!(p.subsets_are_exhaustive(), false);
+        assert!(!p.subsets_are_exhaustive());
         p.add(1);
         p.add_with_index(0, 1);
         p.canonicalize();
@@ -670,7 +670,7 @@ mod tests_partition {
         p.remove_with_index(2, 1);
         p.canonicalize();
         assert_eq!(p.to_string(), "0 0 _ 1 1 1");
-        assert_ne!(p.subsets_are_exhaustive(), true);
+        assert!(!p.subsets_are_exhaustive());
         p.remove_with_index(0, 0);
         p.remove_with_index(1, 0);
         assert_eq!(p.to_string(), "_ _ _ 1 1 1");
@@ -1031,11 +1031,11 @@ mod tests_subset {
     #[test]
     fn test_add() {
         let mut s = Subset::new();
-        assert_eq!(s.add(0), true);
-        assert_eq!(s.add(1), true);
-        assert_eq!(s.add(0), false);
-        assert_eq!(s.add(1), false);
-        assert_eq!(s.add(0), false);
+        assert!(s.add(0));
+        assert!(s.add(1));
+        assert!(!s.add(0));
+        assert!(!s.add(1));
+        assert!(!s.add(0));
         assert_eq!(s.n_items(), 2);
         assert_eq!(s.to_string(), "{0,1}");
     }
@@ -1043,19 +1043,19 @@ mod tests_subset {
     #[test]
     fn test_merge() {
         let mut s1 = Subset::from([2, 1, 6, 2].iter());
-        let mut s2 = Subset::from([0, 2, 1].iter());
-        s1.merge(&mut s2);
+        let s2 = Subset::from([0, 2, 1].iter());
+        s1.merge(&s2);
         assert_eq!(s1.to_string(), "{0,1,2,6}");
         let mut s3 = Subset::from([7, 2].iter());
-        s3.merge(&mut s1);
+        s3.merge(&s1);
         assert_eq!(s3.to_string(), "{0,1,2,6,7}");
     }
 
     #[test]
     fn test_remove() {
         let mut s = Subset::from([2, 1, 6, 2].iter());
-        assert_eq!(s.remove(0), false);
-        assert_eq!(s.remove(2), true);
+        assert!(!s.remove(0));
+        assert!(s.remove(2));
         assert_eq!(s.to_string(), "{1,6}");
     }
 
@@ -1328,7 +1328,7 @@ impl<'a> PartitionsHolderBorrower<'a> {
     }
 }
 
-impl<'a> fmt::Display for PartitionsHolderBorrower<'a> {
+impl fmt::Display for PartitionsHolderBorrower<'_> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         for i in 0..self.n_partitions {
             let x = self.get(i).to_string();
