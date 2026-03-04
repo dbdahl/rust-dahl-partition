@@ -1148,7 +1148,7 @@ impl PartitionsHolder {
         self.n_partitions += 1
     }
 
-    pub fn view(&mut self) -> PartitionsHolderBorrower {
+    pub fn view(&mut self) -> PartitionsHolderBorrower<'_> {
         PartitionsHolderBorrower::from_slice(
             &mut self.data[..],
             self.n_partitions,
@@ -1509,7 +1509,7 @@ impl SquareMatrix {
         &mut self.data[..]
     }
 
-    pub fn view(&mut self) -> SquareMatrixBorrower {
+    pub fn view(&mut self) -> SquareMatrixBorrower<'_> {
         SquareMatrixBorrower::from_slice(&mut self.data[..], self.n_items)
     }
 
