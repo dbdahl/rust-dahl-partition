@@ -1,6 +1,6 @@
 [package]
 name = "dahl-partition"
-version = "0.5.4"
+version = "0.5.5"
 authors = ["David B. Dahl <dahl@stat.byu.edu>"]
 edition = "2024"
 description = "An efficient representation of a set partition."
@@ -9,4 +9,4 @@ license = "MIT OR Apache-2.0"
 rust-version = "1.88"
 
 [dependencies]
-rand = "0.9.0"
+rand = "0.10.0"
