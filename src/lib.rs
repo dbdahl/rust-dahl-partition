@@ -2,8 +2,8 @@
 
 extern crate rand;
 
-use rand::seq::SliceRandom;
 use rand::Rng;
+use rand::seq::SliceRandom;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -1214,7 +1214,7 @@ impl<'a> PartitionsHolderBorrower<'a> {
         n_items: usize,
         by_row: bool,
     ) -> Self {
-        let data = slice::from_raw_parts_mut(data, n_partitions * n_items);
+        let data = unsafe { slice::from_raw_parts_mut(data, n_partitions * n_items) };
         Self {
             data,
             n_partitions,
@@ -1244,9 +1244,9 @@ impl<'a> PartitionsHolderBorrower<'a> {
     /// You're on your own with the indices.
     pub unsafe fn get_unchecked(&self, (i, j): (usize, usize)) -> &i32 {
         if self.by_row {
-            self.data.get_unchecked(self.n_partitions * j + i)
+            unsafe { self.data.get_unchecked(self.n_partitions * j + i) }
         } else {
-            self.data.get_unchecked(self.n_items * i + j)
+            unsafe { self.data.get_unchecked(self.n_items * i + j) }
         }
     }
 
@@ -1255,9 +1255,9 @@ impl<'a> PartitionsHolderBorrower<'a> {
     /// You're on your own with the indices.
     pub unsafe fn get_unchecked_mut(&mut self, (i, j): (usize, usize)) -> &mut i32 {
         if self.by_row {
-            self.data.get_unchecked_mut(self.n_partitions * j + i)
+            unsafe { self.data.get_unchecked_mut(self.n_partitions * j + i) }
         } else {
-            self.data.get_unchecked_mut(self.n_items * i + j)
+            unsafe { self.data.get_unchecked_mut(self.n_items * i + j) }
         }
     }
 
@@ -1391,7 +1391,7 @@ mod tests_partitions_holder {
 }
 
 #[doc(hidden)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn dahl_partition__enumerated(
     n_partitions: i32,
     n_items: i32,
@@ -1399,7 +1399,8 @@ pub unsafe extern "C" fn dahl_partition__enumerated(
 ) {
     let n_partitions = usize::try_from(n_partitions).unwrap();
     let n_items = usize::try_from(n_items).unwrap();
-    let mut phv = PartitionsHolderBorrower::from_ptr(partitions_ptr, n_partitions, n_items, true);
+    let mut phv =
+        unsafe { PartitionsHolderBorrower::from_ptr(partitions_ptr, n_partitions, n_items, true) };
     for partition in Partition::iter(n_items) {
         phv.push_slice(&partition[..]);
     }
@@ -1546,7 +1547,7 @@ impl<'a> SquareMatrixBorrower<'a> {
     ///
     /// Added for FFI.
     pub unsafe fn from_ptr(data: *mut f64, n_items: usize) -> Self {
-        let data = slice::from_raw_parts_mut(data, n_items * n_items);
+        let data = unsafe { slice::from_raw_parts_mut(data, n_items * n_items) };
         Self { data, n_items }
     }
 
@@ -1558,14 +1559,14 @@ impl<'a> SquareMatrixBorrower<'a> {
     ///
     /// You're on your own with the indices.
     pub unsafe fn get_unchecked(&self, (i, j): (usize, usize)) -> &f64 {
-        self.data.get_unchecked(self.n_items * j + i)
+        unsafe { self.data.get_unchecked(self.n_items * j + i) }
     }
 
     /// # Safety
     ///
     /// You're on your own with the indices.
     pub unsafe fn get_unchecked_mut(&mut self, (i, j): (usize, usize)) -> &mut f64 {
-        self.data.get_unchecked_mut(self.n_items * j + i)
+        unsafe { self.data.get_unchecked_mut(self.n_items * j + i) }
     }
 
     pub fn data(&self) -> &[f64] {
