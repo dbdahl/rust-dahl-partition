@@ -6,7 +6,7 @@ edition = "2024"
 description = "An efficient representation of a set partition."
 homepage = "https://dahl.byu.edu"
 license = "MIT OR Apache-2.0"
-rust-version = "1.88"
+rust-version = "1.85.1"
 
 [dependencies]
 rand = "0.10.0"
