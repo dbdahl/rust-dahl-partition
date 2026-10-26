@@ -9,8 +9,12 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::convert::TryFrom;
 use std::fmt;
-use std::hash::Hash;
+use std::hash::{BuildHasherDefault, DefaultHasher, Hash};
 use std::slice;
+
+// A hasher with fixed-key so that the order of a subset's items (and, therefore, the floating-point sums over
+// them) are the same from run to run.
+type ItemSet = HashSet<usize, BuildHasherDefault<DefaultHasher>>;
 
 /// A partition of `n_items` is a set of subsets such that the subsets are mutually exclusive,
 /// nonempty, and exhaustive.  This data structure enforces mutually exclusivity and provides
@@ -742,7 +746,11 @@ pub struct PartitionIterator {
 impl PartitionIterator {
     fn advance(&mut self, times: u32) {
         for _ in 0..times {
-            let mut i = self.n_items - 1;
+            // The empty set has only one partition.
+            let Some(mut i) = self.n_items.checked_sub(1) else {
+                self.done = true;
+                return;
+            };
             while (i > 0) && (self.labels[i] == self.max[i - 1] + 1) {
                 self.labels[i] = 0;
                 self.max[i] = self.max[i - 1];
@@ -793,6 +801,10 @@ mod tests_iterator {
 
     #[test]
     fn test_iterator() {
+        test_iterator_engine(0, 1);
+        assert_eq!(Partition::iter(0).next(), Some(vec![]));
+        let shards = Partition::iter_sharded(4, 0);
+        assert_eq!(shards.into_iter().map(|x| x.count()).sum::<usize>(), 1);
         test_iterator_engine(1, 1);
         test_iterator_engine(2, 2);
         let mut ph = PartitionsHolder::with_capacity(5, 3);
@@ -827,7 +839,7 @@ mod tests_iterator {
 #[derive(Debug, Clone)]
 pub struct Subset {
     n_items: usize,
-    set: HashSet<usize>,
+    set: ItemSet,
     vector: Vec<usize>,
     is_clean: bool,
 }
@@ -836,7 +848,7 @@ impl Subset {
     pub fn new() -> Subset {
         Subset {
             n_items: 0,
-            set: HashSet::new(),
+            set: ItemSet::default(),
             vector: Vec::new(),
             is_clean: true,
         }
@@ -846,7 +858,7 @@ impl Subset {
     where
         I: Iterator<Item = &'a usize>,
     {
-        let mut set = HashSet::new();
+        let mut set = ItemSet::default();
         let mut vector = Vec::new();
         let mut n_items = 0;
         for i in x {
@@ -918,7 +930,7 @@ impl Subset {
     }
 
     pub fn intersection(&self, other: &Subset) -> Subset {
-        let set: HashSet<usize> = self.set.intersection(&other.set).copied().collect();
+        let set: ItemSet = self.set.intersection(&other.set).copied().collect();
         Subset {
             n_items: set.len(),
             set,
@@ -1060,6 +1072,20 @@ mod tests_subset {
     }
 
     #[test]
+    fn test_order_after_clean_is_reproducible() {
+        let items = || {
+            let mut s = Subset::from((0..100).collect::<Vec<_>>().iter());
+            s.remove(50);
+            s.clean();
+            s.items().clone()
+        };
+        let first = items();
+        for _ in 0..10 {
+            assert_eq!(items(), first);
+        }
+    }
+
+    #[test]
     fn test_equality() {
         let s1 = Subset::from([2, 1, 6, 2].iter());
         let s2 = Subset::from([6, 1, 2].iter());
@@ -1156,6 +1182,15 @@ impl PartitionsHolder {
             self.by_row,
         )
     }
+
+    pub fn as_view(&self) -> PartitionsHolderView<'_> {
+        PartitionsHolderView::from_slice(
+            &self.data[..],
+            self.n_partitions,
+            self.n_items,
+            self.by_row,
+        )
+    }
 }
 
 #[doc(hidden)]
@@ -1239,6 +1274,10 @@ impl<'a> PartitionsHolderBorrower<'a> {
         self.data
     }
 
+    pub fn as_view(&self) -> PartitionsHolderView<'_> {
+        PartitionsHolderView::from_slice(self.data, self.n_partitions, self.n_items, self.by_row)
+    }
+
     /// # Safety
     ///
     /// You're on your own with the indices.
@@ -1262,23 +1301,11 @@ impl<'a> PartitionsHolderBorrower<'a> {
     }
 
     pub fn get(&self, i: usize) -> Partition {
-        if self.by_row {
-            let mut labels = Vec::with_capacity(self.n_items);
-            for j in 0..self.n_items {
-                labels.push(self.data[self.n_partitions * j + i]);
-            }
-            Partition::from(&labels[..])
-        } else {
-            Partition::from(&self.data[(i * self.n_items)..((i + 1) * self.n_items)])
-        }
+        self.as_view().get(i)
     }
 
     pub fn get_all(&self) -> Vec<Partition> {
-        let mut x = Vec::with_capacity(self.n_partitions);
-        for k in 0..self.n_partitions {
-            x.push(self.get(k))
-        }
-        x
+        self.as_view().get_all()
     }
 
     pub fn push_slice(&mut self, partition: &[usize]) {
@@ -1330,6 +1357,92 @@ impl<'a> PartitionsHolderBorrower<'a> {
 
 impl fmt::Display for PartitionsHolderBorrower<'_> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        self.as_view().fmt(fmt)
+    }
+}
+
+/// A read-only counterpart of [`PartitionsHolderBorrower`].
+#[doc(hidden)]
+#[derive(Clone, Copy)]
+pub struct PartitionsHolderView<'a> {
+    data: &'a [i32],
+    n_partitions: usize,
+    n_items: usize,
+    by_row: bool,
+}
+
+impl std::ops::Index<(usize, usize)> for PartitionsHolderView<'_> {
+    type Output = i32;
+    fn index(&self, (i, j): (usize, usize)) -> &Self::Output {
+        if self.by_row {
+            &self.data[self.n_partitions * j + i]
+        } else {
+            &self.data[self.n_items * i + j]
+        }
+    }
+}
+
+impl<'a> PartitionsHolderView<'a> {
+    pub fn from_slice(data: &'a [i32], n_partitions: usize, n_items: usize, by_row: bool) -> Self {
+        assert_eq!(data.len(), n_partitions * n_items);
+        Self {
+            data,
+            n_partitions,
+            n_items,
+            by_row,
+        }
+    }
+
+    pub fn n_partitions(&self) -> usize {
+        self.n_partitions
+    }
+
+    pub fn n_items(&self) -> usize {
+        self.n_items
+    }
+
+    pub fn by_row(&self) -> bool {
+        self.by_row
+    }
+
+    pub fn data(&self) -> &'a [i32] {
+        self.data
+    }
+
+    /// # Safety
+    ///
+    /// You're on your own with the indices.
+    pub unsafe fn get_unchecked(&self, (i, j): (usize, usize)) -> &'a i32 {
+        if self.by_row {
+            unsafe { self.data.get_unchecked(self.n_partitions * j + i) }
+        } else {
+            unsafe { self.data.get_unchecked(self.n_items * i + j) }
+        }
+    }
+
+    pub fn get(&self, i: usize) -> Partition {
+        if self.by_row {
+            let mut labels = Vec::with_capacity(self.n_items);
+            for j in 0..self.n_items {
+                labels.push(self.data[self.n_partitions * j + i]);
+            }
+            Partition::from(&labels[..])
+        } else {
+            Partition::from(&self.data[(i * self.n_items)..((i + 1) * self.n_items)])
+        }
+    }
+
+    pub fn get_all(&self) -> Vec<Partition> {
+        let mut x = Vec::with_capacity(self.n_partitions);
+        for k in 0..self.n_partitions {
+            x.push(self.get(k))
+        }
+        x
+    }
+}
+
+impl fmt::Display for PartitionsHolderView<'_> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         for i in 0..self.n_partitions {
             let x = self.get(i).to_string();
             fmt.write_str(&x[..])?;
@@ -1342,6 +1455,25 @@ impl fmt::Display for PartitionsHolderBorrower<'_> {
 #[cfg(test)]
 mod tests_partitions_holder {
     use super::*;
+
+    #[test]
+    fn test_partitions_holder_view() {
+        // Rows are partitions in column-major order, as in an R matrix.
+        let data = [0, 0, 0, 0, 1, 0, 1, 2, 1, 2, 3, 0];
+        let view = PartitionsHolderView::from_slice(&data, 3, 4, true);
+        assert_eq!(view.n_partitions(), 3);
+        assert_eq!(view.n_items(), 4);
+        assert_eq!(view[(1, 3)], 3);
+        assert_eq!(unsafe { *view.get_unchecked((1, 2)) }, 2);
+        assert_eq!(view.get(0), Partition::from("AABC".as_bytes()));
+        assert_eq!(view.get(2), Partition::from("AABA".as_bytes()));
+        assert_eq!(view.to_string(), "0 0 1 2\n0 1 2 3\n0 0 1 0\n");
+        let mut phf = PartitionsHolder::new(4);
+        phf.push_partition(&Partition::from("AABC".as_bytes()));
+        phf.push_partition(&Partition::from("ABCD".as_bytes()));
+        assert_eq!(phf.as_view().get_all(), phf.view().get_all());
+        assert_eq!(phf.view().as_view().data(), &[0, 0, 1, 2, 0, 1, 2, 3]);
+    }
 
     #[test]
     fn test_partition_holder() {
@@ -1514,6 +1646,10 @@ impl SquareMatrix {
         SquareMatrixBorrower::from_slice(&mut self.data[..], self.n_items)
     }
 
+    pub fn as_view(&self) -> SquareMatrixView<'_> {
+        SquareMatrixView::from_slice(&self.data[..], self.n_items)
+    }
+
     pub fn n_items(&self) -> usize {
         self.n_items
     }
@@ -1577,6 +1713,54 @@ impl<'a> SquareMatrixBorrower<'a> {
         self.data
     }
 
+    pub fn as_view(&self) -> SquareMatrixView<'_> {
+        SquareMatrixView::from_slice(self.data, self.n_items)
+    }
+
+    pub fn sum_of_triangle(&self) -> f64 {
+        self.as_view().sum_of_triangle()
+    }
+
+    pub fn sum_of_row_subset(&self, row: usize, columns: &[usize]) -> f64 {
+        self.as_view().sum_of_row_subset(row, columns)
+    }
+}
+
+/// A read-only counterpart of [`SquareMatrixBorrower`].
+#[derive(Clone, Copy)]
+pub struct SquareMatrixView<'a> {
+    data: &'a [f64],
+    n_items: usize,
+}
+
+impl std::ops::Index<(usize, usize)> for SquareMatrixView<'_> {
+    type Output = f64;
+    fn index(&self, (i, j): (usize, usize)) -> &Self::Output {
+        &self.data[self.n_items * j + i]
+    }
+}
+
+impl<'a> SquareMatrixView<'a> {
+    pub fn from_slice(data: &'a [f64], n_items: usize) -> Self {
+        assert_eq!(data.len(), n_items * n_items);
+        Self { data, n_items }
+    }
+
+    pub fn n_items(&self) -> usize {
+        self.n_items
+    }
+
+    /// # Safety
+    ///
+    /// You're on your own with the indices.
+    pub unsafe fn get_unchecked(&self, (i, j): (usize, usize)) -> &'a f64 {
+        unsafe { self.data.get_unchecked(self.n_items * j + i) }
+    }
+
+    pub fn data(&self) -> &'a [f64] {
+        self.data
+    }
+
     pub fn sum_of_triangle(&self) -> f64 {
         let mut sum = 0.0;
         for i in 0..self.n_items {
@@ -1593,5 +1777,23 @@ impl<'a> SquareMatrixBorrower<'a> {
             sum += unsafe { *self.get_unchecked((row, *j)) };
         }
         sum
+    }
+}
+
+#[cfg(test)]
+mod tests_square_matrix {
+    use super::*;
+
+    #[test]
+    fn test_view_matches_borrower() {
+        let mut m = SquareMatrix::zeros(3);
+        m.data_mut()
+            .copy_from_slice(&[1.0, 0.2, 0.3, 0.2, 1.0, 0.4, 0.3, 0.4, 1.0]);
+        let data = m.data().to_vec();
+        let view = SquareMatrixView::from_slice(&data, 3);
+        assert_eq!(view[(2, 1)], 0.4);
+        assert_eq!(view.sum_of_triangle(), m.view().sum_of_triangle());
+        assert_eq!(view.sum_of_row_subset(0, &[1, 2]), 0.5);
+        assert_eq!(m.as_view().data(), &data[..]);
     }
 }
